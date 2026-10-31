@@ -144,7 +144,8 @@ class DemoClient:
 
     async def market(self, symbol: str, interval: str) -> Market:
         target = {"BTC": 97428.60, "ETH": 3518.42, "SOL": 176.82}.get(symbol.split("_")[0], 42.5)
-        rng = random.Random(symbol + interval)
+        # Deterministic sample data only; never used for security decisions.
+        rng = random.Random(symbol + interval)  # nosec B311
         seconds = INTERVALS[interval][1]
         now = int(time.time()) // seconds * seconds
         values = []
@@ -182,7 +183,8 @@ class DemoClient:
     ) -> list[Candle]:
         market = await self.market(symbol, interval)
         seconds = INTERVALS[interval][1]
-        rng = random.Random(symbol + interval + "history")
+        # Deterministic sample history only; never used for security decisions.
+        rng = random.Random(symbol + interval + "history")  # nosec B311
         anchor = float(market.candles[0].open)
         candles = []
         for index in range(min(limit, 2000)):

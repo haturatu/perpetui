@@ -49,8 +49,9 @@ def load_hl_account(
                     if "network" in columns:
                         clause += " AND network = ?"
                         values.append(network)
+                    # The clause is chosen from fixed strings; only values are interpolated.
                     row = conn.execute(
-                        f"SELECT alias, user_address FROM accounts WHERE {clause} "
+                        f"SELECT alias, user_address FROM accounts WHERE {clause} "  # nosec B608
                         "ORDER BY id LIMIT 1",
                         values,
                     ).fetchone()

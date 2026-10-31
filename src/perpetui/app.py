@@ -495,7 +495,8 @@ class TradingApp(App[None]):
         candidate, retired = None, None
         try:
             try:
-                assert self._client_factory is not None
+                if self._client_factory is None:
+                    raise ValueError("Client factory is not configured")
                 candidate = self._client_factory(exchange)
             except (CredentialsError, ExchangeError, ValueError, OSError) as exc:
                 logger.warning("Cannot switch exchange (%s)", type(exc).__name__)

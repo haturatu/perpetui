@@ -11,7 +11,8 @@ from contextlib import closing
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from Crypto.Cipher import ChaCha20
+# PyCryptodome, not the deprecated PyCrypto package.
+from Crypto.Cipher import ChaCha20  # nosec B413
 
 
 class CredentialsError(ValueError):

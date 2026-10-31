@@ -57,8 +57,9 @@ def load_lighter_account(
                     if "network" in columns:
                         clause += " AND network = ?"
                         values.append(network)
+                    # The clause is chosen from fixed strings; only values are interpolated.
                     row = connection.execute(
-                        f"SELECT alias, account_index FROM accounts WHERE {clause} "
+                        f"SELECT alias, account_index FROM accounts WHERE {clause} "  # nosec B608
                         "ORDER BY alias LIMIT 1",
                         values,
                     ).fetchone()
