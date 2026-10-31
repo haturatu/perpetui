@@ -9,22 +9,28 @@ VENV := $(CURDIR)/.venv
 VENV_PYTHON := $(VENV)/bin/python
 BUILD_DIR := $(CURDIR)/build
 BIN := $(BUILD_DIR)/perpetui
+INSTALL_BIN := $(BUILD_DIR)/perpetui-install
 COMPLETION_DIR := $(BUILD_DIR)/completions
 MAN_DIR := $(BUILD_DIR)/man/man1
+LOCK_RUNTIME := $(CURDIR)/requirements.lock
+LOCK_DEV := $(CURDIR)/requirements-dev.lock
 
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
 DATADIR ?= $(or $(XDG_DATA_HOME),$(PREFIX)/share)
 APPDIR := $(DATADIR)/perpetui
 INSTALL_VENV := $(APPDIR)/venv
+INSTALL_PYTHON := $(INSTALL_VENV)/bin/python
+INSTALL_LDFLAGS := -X github.com/haturatu/perpetui/internal/launcher.InstalledPython=$(INSTALL_PYTHON)
 INSTALL_BASH := $(DATADIR)/bash-completion/completions/perpetui
 INSTALL_ZSH := $(DATADIR)/zsh/site-functions/_perpetui
 INSTALL_FISH := $(DATADIR)/fish/vendor_completions.d/perpetui.fish
 INSTALL_PWSH := $(APPDIR)/completions/perpetui.ps1
 INSTALL_MAN := $(DATADIR)/man/man1
 
-.PHONY: setup build build-go run demo test lint format check completions man release \
-	install install-python install-completions install-man uninstall clean
+.PHONY: setup build build-go build-install lock run demo test lint format check \
+	completions man release install install-python install-completions install-man \
+	uninstall clean
 
 setup:
 	@if [ "$(PY_TOOL)" = "uv" ] || \
@@ -33,9 +39,11 @@ setup:
 		UV_PROJECT_ENVIRONMENT="$(VENV)" "$(UV)" sync --locked --dev; \
 	elif [ "$(PY_TOOL)" = "auto" ] || [ "$(PY_TOOL)" = "pip" ]; then \
 		echo "Using venv + pip"; \
+		rm -rf "$(VENV)"; \
 		"$(PYTHON)" -m venv "$(VENV)"; \
 		"$(VENV_PYTHON)" -m pip install --upgrade "pip>=25.1"; \
-		"$(VENV_PYTHON)" -m pip install -e . --group dev; \
+		"$(VENV_PYTHON)" -m pip install -r "$(LOCK_DEV)"; \
+		"$(VENV_PYTHON)" -m pip install -e . --no-deps; \
 	else \
 		echo "Unknown PY_TOOL: $(PY_TOOL)" >&2; \
 		exit 2; \
@@ -45,7 +53,15 @@ build-go:
 	@mkdir -p "$(BUILD_DIR)"
 	"$(GO)" build -trimpath -o "$(BIN)" ./cmd/perpetui
 
+build-install:
+	@mkdir -p "$(BUILD_DIR)"
+	"$(GO)" build -trimpath -ldflags "$(INSTALL_LDFLAGS)" -o "$(INSTALL_BIN)" ./cmd/perpetui
+
 build: setup build-go
+
+lock:
+	"$(UV)" export --locked --no-dev --no-emit-project --format requirements-txt -o "$(LOCK_RUNTIME)"
+	"$(UV)" export --locked --dev --no-emit-project --format requirements-txt -o "$(LOCK_DEV)"
 
 run: build
 	PERPETUI_PYTHON="$(VENV_PYTHON)" "$(BIN)" $(ARGS)
@@ -90,9 +106,11 @@ install-python:
 		UV_PROJECT_ENVIRONMENT="$(INSTALL_VENV)" "$(UV)" sync --locked --no-dev --no-editable; \
 	elif [ "$(PY_TOOL)" = "auto" ] || [ "$(PY_TOOL)" = "pip" ]; then \
 		echo "Installing Python dependencies with pip"; \
+		rm -rf "$(INSTALL_VENV)"; \
 		"$(PYTHON)" -m venv "$(INSTALL_VENV)"; \
-		"$(INSTALL_VENV)/bin/python" -m pip install --upgrade "pip>=25.1"; \
-		"$(INSTALL_VENV)/bin/python" -m pip install .; \
+		"$(INSTALL_PYTHON)" -m pip install --upgrade "pip>=25.1"; \
+		"$(INSTALL_PYTHON)" -m pip install -r "$(LOCK_RUNTIME)"; \
+		"$(INSTALL_PYTHON)" -m pip install . --no-deps; \
 	else \
 		echo "Unknown PY_TOOL: $(PY_TOOL)" >&2; \
 		exit 2; \
@@ -110,9 +128,9 @@ install-man: man
 	@mkdir -p "$(INSTALL_MAN)"
 	install -m 644 "$(MAN_DIR)"/*.1 "$(INSTALL_MAN)/"
 
-install: build-go install-python install-completions install-man
+install: build-install install-python install-completions install-man
 	@mkdir -p "$(BINDIR)"
-	install -m 755 "$(BIN)" "$(BINDIR)/perpetui"
+	install -m 755 "$(INSTALL_BIN)" "$(BINDIR)/perpetui"
 	@echo "Installed: $(BINDIR)/perpetui"
 	@echo "Python venv: $(INSTALL_VENV)"
 
