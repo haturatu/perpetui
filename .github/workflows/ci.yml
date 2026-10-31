@@ -4,6 +4,7 @@ name: CI
 # successfully rather than remain pending due to workflow-level path filters.
 on:
   push:
+    branches: [master]
   pull_request:
 
 permissions:
