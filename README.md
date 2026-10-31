@@ -12,9 +12,36 @@ Hyperliquid・Lighter・MEXC の先物チャート・保有ポジションを表
 - `mexc-cli`・`hl`・`lighter` の保存済みアカウント、または環境変数から設定を読み込みます。
 - 日本語・英語の表示に対応しています。
 
+## 依存関係
+
+実行時:
+
+- Python 3.11 以上
+- Python パッケージ（`pyproject.toml` / `uv.lock` で管理）
+  - `textual>=6.0,<9`
+  - `plotext>=6.1,<7`
+  - `httpx>=0.28,<1`
+  - `websockets>=15,<17`
+  - `pycryptodome>=3.20,<4`
+- ANSI / UTF-8 に対応した端末（120列 × 40行以上を推奨）
+- 任意: `mexc-cli`・`hl`・`lighter` の保存済みアカウント、または各取引所の環境変数
+
+ビルド・開発:
+
+- Go 1.23 以上（Cobra ランチャーのビルド時のみ。インストール済みバイナリの実行には不要）
+- `make`
+- [uv](https://docs.astral.sh/uv/)（任意。ない場合は `venv` + pip を使用）
+- pip 25.1 以上（pip フォールバック時）
+- git（ソースを取得する場合）
+
+Go モジュール:
+
+- `github.com/spf13/cobra` v1.10.2
+- `github.com/spf13/pflag` v1.0.9
+- man ページ生成用の間接依存（`go.mod` / `go.sum` で固定）
+
 ## 起動
 
-Python 3.11以上が必要です。Go ランチャーをビルドする場合は Go 1.23以上も使用します。
 依存解決には [uv](https://docs.astral.sh/uv/) があると高速です。uv がない場合は venv + pip を使用します。
 
 ```bash
