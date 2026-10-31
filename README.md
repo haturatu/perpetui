@@ -163,10 +163,13 @@ make test           # Python / Go のテスト
 make lint           # Ruff / go vet / gofmt
 make completions    # Bash / Zsh / Fish / PowerShell 補完を生成
 make man            # man ページを生成
+make lock           # pip 用の requirements.lock / requirements-dev.lock を更新
 ```
 
 依存解決は `uv` がインストールされていれば自動的に uv を使い、
-なければ `python3 -m venv` と pip にフォールバックします。明示する場合は次のように指定します。
+なければ `python3 -m venv` と pip にフォールバックします。pip 経路でも
+`requirements.lock` / `requirements-dev.lock` の固定バージョンを使用します。
+明示する場合は次のように指定します。
 
 ```bash
 make setup PY_TOOL=uv
@@ -192,12 +195,14 @@ perpetui --exchange lighter
 perpetui --exchange hyperliquid --public
 ```
 
-Python 環境は次の順で検出します。`PERPETUI_PYTHON` を指定すると、その Python を優先します。
+Python 環境の検出方法は、インストール版と開発版で分離されています。
 
-1. `PERPETUI_PYTHON`
-2. `$XDG_DATA_HOME/perpetui/venv`（通常は `~/.local/share/perpetui/venv`）
-3. リポジトリ内の `.venv`
-4. カレントディレクトリの `.venv`
+- インストール版（`make install`）: `make install` 時に埋め込んだ専用 venv のみを使用
+- 開発版（`make build` / `build/perpetui`）: リポジトリ内またはカレントディレクトリの `.venv`
+- `PERPETUI_PYTHON` を指定した場合は、どちらでもその Python を最優先
+
+インストール後に配置先を移動した場合は、埋め込まれた venv パスが変わるため
+`make install` を再実行してください。
 
 `perpetui --help`、`perpetui --version`、`perpetui completion ...`、`perpetui docs man` は
 Python を起動せず Go 側だけで完結します。
