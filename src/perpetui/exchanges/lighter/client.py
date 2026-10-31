@@ -11,6 +11,7 @@ from typing import Any
 
 import httpx
 
+from perpetui import __version__
 from perpetui.domain.intervals import INTERVAL_SECONDS
 from perpetui.domain.models import (
     Candle,
@@ -71,7 +72,7 @@ class LighterClient(LighterClientStreams):
             base_url=base_url,
             timeout=timeout,
             transport=transport,
-            headers={"User-Agent": "perpetui/0.1.0"},
+            headers={"User-Agent": f"perpetui/{__version__}"},
         )
         self._metadata: dict[str, dict[str, Any]] = {}
         self._by_id: dict[int, dict[str, Any]] = {}

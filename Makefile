@@ -30,7 +30,7 @@ INSTALL_MAN := $(DATADIR)/man/man1
 
 .PHONY: setup build build-go build-install lock run demo test lint format check \
 	completions man release install install-python install-completions install-man \
-	uninstall clean
+	uninstall clean sync-version
 
 setup:
 	@if [ "$(PY_TOOL)" = "uv" ] || \
@@ -49,11 +49,14 @@ setup:
 		exit 2; \
 	fi
 
-build-go:
+sync-version:
+	"$(PYTHON)" scripts/sync_version.py
+
+build-go: sync-version
 	@mkdir -p "$(BUILD_DIR)"
 	"$(GO)" build -trimpath -o "$(BIN)" ./cmd/perpetui
 
-build-install:
+build-install: sync-version
 	@mkdir -p "$(BUILD_DIR)"
 	"$(GO)" build -trimpath -ldflags "$(INSTALL_LDFLAGS)" -o "$(INSTALL_BIN)" ./cmd/perpetui
 

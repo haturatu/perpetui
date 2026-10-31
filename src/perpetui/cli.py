@@ -4,9 +4,8 @@ import argparse
 
 from perpetui.domain.intervals import INTERVAL_SECONDS
 from perpetui.errors import CredentialsError
-from perpetui.exchanges.factory import create_client_factory
+from perpetui.exchanges.factory import create_client_factory, intervals_for
 from perpetui.exchanges.lighter.account import validate_account_index
-from perpetui.exchanges.lighter.client import LighterClient
 from perpetui.i18n import LANGUAGES, _, install_language
 from perpetui.konsole import install_keymap
 from perpetui.logging_config import configure_logging
@@ -145,7 +144,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.exchange in {"lighter", "lt"} and mexc_options:
         parser.error(_("MEXC options require --exchange mexc"))
     exchange = {"hl": "hyperliquid", "lt": "lighter"}.get(args.exchange, args.exchange)
-    supported = LighterClient.intervals if exchange == "lighter" else tuple(INTERVAL_SECONDS)
+    supported = intervals_for(exchange)
     if args.interval not in supported:
         parser.error(
             _(

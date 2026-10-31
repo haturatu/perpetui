@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import argparse
 import os
 from collections.abc import Callable
+from typing import Protocol
 
 from perpetui.exchanges.base import DataSource
 from perpetui.exchanges.demo import DemoClient
@@ -15,7 +15,35 @@ from perpetui.exchanges.mexc.client import MEXCClient
 from perpetui.exchanges.mexc.stream import DEFAULT_WS_URL
 
 
-def create_client_factory(args: argparse.Namespace) -> Callable[[str], DataSource]:
+class ClientOptions(Protocol):
+    """Read-only settings accepted from a CLI or another application entry point."""
+
+    exchange: str
+    account: str | None
+    websocket_url: str | None
+    demo: bool
+    demo_empty: bool
+    public: bool
+    hl_command: str | None
+    wallet_address: str | None
+    testnet: bool
+    timeout: float
+    hyperliquid_base_url: str | None
+    no_websocket: bool
+    lighter_account_index: int | None
+    lighter_config: str | None
+    lighter_base_url: str | None
+    mexc_command: str | None
+    futures_base_url: str | None
+
+
+def intervals_for(exchange: str) -> tuple[str, ...]:
+    return {"mexc": MEXCClient, "hyperliquid": HyperliquidClient, "lighter": LighterClient}[
+        exchange
+    ].intervals
+
+
+def create_client_factory(args: ClientOptions) -> Callable[[str], DataSource]:
     initial_exchange = {"hl": "hyperliquid", "lt": "lighter"}.get(args.exchange, args.exchange)
 
     def create(exchange: str) -> DataSource:
