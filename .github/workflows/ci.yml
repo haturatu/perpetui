@@ -39,6 +39,7 @@ jobs:
           filters: |
             python:
               - 'src/**'
+              - 'scripts/**'
               - 'tests/**'
               - 'packaging/**'
               - 'pyproject.toml'
@@ -46,12 +47,15 @@ jobs:
               - '.github/workflows/ci.yml'
             go:
               - 'cmd/**'
+              - 'scripts/**'
+              - 'pyproject.toml'
               - 'internal/**'
               - 'go.mod'
               - 'go.sum'
               - '.github/workflows/ci.yml'
             install:
               - 'Makefile'
+              - 'scripts/**'
               - 'cmd/**'
               - 'internal/**'
               - 'go.mod'

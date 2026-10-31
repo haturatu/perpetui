@@ -13,8 +13,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-const version = "0.1.0"
-
 var runTUI = func(args []string) error {
 	python, err := launcher.FindPython()
 	if err != nil {
@@ -42,14 +40,14 @@ func NewRootCommand() *cobra.Command {
 	root.DisableAutoGenTag = true
 
 	flags := root.Flags()
-	flags.String("lang", "", "UI language: en or ja (default: system locale)")
-	flags.String("exchange", "hyperliquid", "Exchange: hyperliquid, hl, lighter, lt or mexc")
+	flags.String("lang", "", "UI language (default: system locale)")
+	flags.String("exchange", "hyperliquid", "Exchange (default: hyperliquid)")
 	flags.Bool("demo", false, "Use sample data, without network access")
 	flags.Bool("demo-empty", false, "Demo with no positions (BTC chart)")
 	flags.Bool("public", false, "Market data only; skip account lookup")
 	flags.String("symbol", "", "Initial symbol, e.g. BTC, ETH_USDT or xyz:CL")
 	flags.String("interval", "15m", "Initial candle interval")
-	flags.Float64("refresh", 5, "REST fallback refresh interval in seconds")
+	flags.Float64("refresh", 5, "REST fallback refresh interval (default: 5)")
 	flags.Bool("no-websocket", false, "Use REST polling for charts and positions")
 	flags.String("websocket-url", "", "Override the selected exchange's WebSocket endpoint")
 	flags.String("account", "", "Saved account alias (default: saved default)")
@@ -62,7 +60,7 @@ func NewRootCommand() *cobra.Command {
 	flags.String("lighter-config", "", "Lighter account database path (default: lighter CLI config)")
 	flags.String("lighter-base-url", "", "Override the Lighter HTTP endpoint")
 	flags.String("futures-base-url", "", "Override the MEXC HTTP endpoint")
-	flags.Float64("timeout", 10, "Network timeout in seconds")
+	flags.Float64("timeout", 10, "Network timeout in seconds (default: 10)")
 	flags.Bool("debug", false, "Enable DEBUG / INFO logs on stdout")
 	flags.Bool("install-konsole-keymap", false, "Install the optional Konsole Ctrl+number keymap")
 
