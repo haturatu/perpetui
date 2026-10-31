@@ -1,11 +1,94 @@
 name: CI
 
+# Keep the workflow enabled on docs-only PRs so required job checks can be skipped
+# successfully rather than remain pending due to workflow-level path filters.
 on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  changes:
+    name: Detect affected components
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      go: ${{ steps.filter.outputs.go }}
+      install: ${{ steps.filter.outputs.install }}
+      security_go: ${{ steps.filter.outputs.security_go }}
+      security_python: ${{ steps.filter.outputs.security_python }}
+      container: ${{ steps.filter.outputs.container }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          # On push, compare against the previous commit on this same branch.
+          # On pull_request, the action compares against the PR base via GitHub API.
+          base: ${{ github.ref }}
+          filters: |
+            python:
+              - 'src/**'
+              - 'tests/**'
+              - 'packaging/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.github/workflows/ci.yml'
+            go:
+              - 'cmd/**'
+              - 'internal/**'
+              - 'go.mod'
+              - 'go.sum'
+              - '.github/workflows/ci.yml'
+            install:
+              - 'Makefile'
+              - 'cmd/**'
+              - 'internal/**'
+              - 'go.mod'
+              - 'go.sum'
+              - 'src/**'
+              - 'packaging/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'requirements*.lock'
+              - '.github/workflows/ci.yml'
+            security_go:
+              - 'cmd/**'
+              - 'internal/**'
+              - 'go.mod'
+              - 'go.sum'
+              - '.github/workflows/ci.yml'
+            security_python:
+              - 'src/**'
+              - 'packaging/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'requirements*.lock'
+              - '.github/workflows/ci.yml'
+            container:
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'cmd/**'
+              - 'internal/**'
+              - 'go.mod'
+              - 'go.sum'
+              - 'src/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.github/workflows/ci.yml'
+
   python:
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -19,6 +102,8 @@ jobs:
       - run: uv run pytest
 
   go:
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -34,6 +119,8 @@ jobs:
 
   install:
     name: Install and launch (${{ matrix.py_tool }})
+    needs: changes
+    if: needs.changes.outputs.install == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -58,37 +145,48 @@ jobs:
 
   security:
     name: Security and dependency audit
+    needs: changes
+    if: needs.changes.outputs.security_go == 'true' || needs.changes.outputs.security_python == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
+        if: needs.changes.outputs.security_go == 'true'
         with:
           go-version: "1.27.3"
           cache: true
           cache-dependency-path: "**/go.sum"
       - name: Run race detector
+        if: needs.changes.outputs.security_go == 'true'
         run: go test -race ./...
       - name: Run govulncheck
+        if: needs.changes.outputs.security_go == 'true'
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
       - uses: astral-sh/setup-uv@v7
+        if: needs.changes.outputs.security_python == 'true'
       - uses: actions/setup-python@v7
+        if: needs.changes.outputs.security_python == 'true'
         with:
           python-version: "3.11"
       - name: Sync locked dependencies
+        if: needs.changes.outputs.security_python == 'true'
         run: uv sync --locked --dev
       - name: Audit Python dependencies
+        if: needs.changes.outputs.security_python == 'true'
         run: |
           uv export --locked --no-dev --no-emit-project --no-hashes \
             --format requirements-txt > /tmp/perpetui-requirements.txt
           uvx pip-audit -r /tmp/perpetui-requirements.txt
       - name: Static security scan
+        if: needs.changes.outputs.security_python == 'true'
         run: uvx bandit -q -r src/perpetui
 
   container-scan:
     name: Container scan
-    needs: go
+    needs: changes
+    if: needs.changes.outputs.container == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
