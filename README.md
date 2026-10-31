@@ -14,7 +14,8 @@ Hyperliquid・Lighter・MEXC の先物チャート・保有ポジションを表
 
 ## 起動
 
-Python 3.11以上と [uv](https://docs.astral.sh/uv/) を使用します。
+Python 3.11以上が必要です。Go ランチャーをビルドする場合は Go 1.23以上も使用します。
+依存解決には [uv](https://docs.astral.sh/uv/) があると高速です。uv がない場合は venv + pip を使用します。
 
 ```bash
 uv sync --dev
@@ -43,6 +44,60 @@ perpetui --no-websocket           # チャート・ポジションともRESTで�
 認証情報が設定されていて保有ポジションがない場合は、ポジション欄にその旨を表示します。
 Hyperliquid は秘密鍵なしでも、監視対象のウォレットアドレスがあればポジションを表示できます。
 Lighter も秘密鍵や認証トークンなしで、アカウント番号だけでポジションを表示できます。
+
+## Go ランチャーとインストール
+
+正式な CLI エントリーポイントは Go 製の `perpetui` です。Go ランチャーは引数をそのまま
+Python の Textual アプリへ渡し、Unix では `exec` でプロセスを置き換えます。
+TUI 本体はこれまでどおり Python 実装です。
+
+```bash
+make setup          # .venv 作成 + Python 依存解決（uv があれば uv、なければ venv + pip）
+make build          # Go バイナリを build/perpetui にビルド
+make run            # Go ランチャー経由で TUI を起動
+make demo           # サンプルデータで起動
+make test           # Python / Go のテスト
+make lint           # Ruff / go vet / gofmt
+make completions    # Bash / Zsh / Fish / PowerShell 補完を生成
+make man            # man ページを生成
+```
+
+依存解決は `uv` がインストールされていれば自動的に uv を使い、
+なければ `python3 -m venv` と pip にフォールバックします。明示する場合は次のように指定します。
+
+```bash
+make setup PY_TOOL=uv
+make setup PY_TOOL=pip
+```
+
+ユーザー領域へのインストール:
+
+```bash
+make install
+```
+
+`~/.local/bin/perpetui`、`~/.local/share/perpetui/venv`、シェル補完、man ページを配置します。
+`PREFIX` / `BINDIR` / `DATADIR` で配置先を変更できます。アンインストールは `make uninstall` です。
+
+インストール後は Go バイナリだけで起動できます。実行時に `uv` は不要です。
+`~/.local/bin` が PATH にない場合は追加してください。
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+perpetui --demo
+perpetui --exchange lighter
+perpetui --exchange hyperliquid --public
+```
+
+Python 環境は次の順で検出します。`PERPETUI_PYTHON` を指定すると、その Python を優先します。
+
+1. `PERPETUI_PYTHON`
+2. `$XDG_DATA_HOME/perpetui/venv`（通常は `~/.local/share/perpetui/venv`）
+3. リポジトリ内の `.venv`
+4. カレントディレクトリの `.venv`
+
+`perpetui --help`、`perpetui --version`、`perpetui completion ...`、`perpetui docs man` は
+Python を起動せず Go 側だけで完結します。
 
 ## 取引所の選択
 
