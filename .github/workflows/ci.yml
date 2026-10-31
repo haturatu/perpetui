@@ -32,6 +32,30 @@ jobs:
       - run: ./build/perpetui completion bash > /dev/null
       - run: ./build/perpetui docs man --dir build/man/man1
 
+  install:
+    name: Install and launch (${{ matrix.py_tool }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        py_tool: [uv, pip]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.3"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@v7
+        if: matrix.py_tool == 'uv'
+      - name: Install and launch through the Go launcher
+        run: |
+          PREFIX="$RUNNER_TEMP/perpetui-install"
+          DATADIR="$PREFIX/share"
+          make install PREFIX="$PREFIX" DATADIR="$DATADIR" PY_TOOL=${{ matrix.py_tool }}
+          XDG_DATA_HOME="$DATADIR" "$PREFIX/bin/perpetui" --install-konsole-keymap --lang en
+
   security:
     name: Security and dependency audit
     runs-on: ubuntu-latest
