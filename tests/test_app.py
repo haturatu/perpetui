@@ -27,7 +27,7 @@ async def test_initial_chart_uses_first_position_or_btc(empty, expected):
         assert app.market.symbol == expected
         assert app.query_one(CandleChart).market.symbol == expected
         assert app.query_one(DataTable).row_count == (0 if empty else 3)
-        assert app.query_one("#positions-pane").display
+        assert app.query_one("#positions-pane").display == (not empty)
         assert app.query_one("#empty").display == empty
 
 

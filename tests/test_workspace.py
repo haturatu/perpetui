@@ -11,7 +11,7 @@ from perpetui.chart_panel import ChartFrame, ExtraChart
 from perpetui.credentials import CredentialsError
 from perpetui.demo import DemoClient
 from perpetui.i18n import install_language
-from perpetui.models import MarketEvent, PositionsEvent
+from perpetui.models import MarketEvent, Positions, PositionsEvent
 from perpetui.search import SymbolSearch
 
 
@@ -504,3 +504,202 @@ async def test_enter_applies_the_already_highlighted_position_to_the_selected_pa
         await settle(app, pilot)
         assert panel.symbol == panel.market.symbol == "ETH_USDT"
         assert app.symbol == "ETH_USDT"
+
+
+def assert_full_chart_rows(app, rows):
+    grid = app.query_one("#chart-grid")
+    frames = list(app.query(ChartFrame))
+    offset = 0
+    bottom = grid.region.y
+    for count in rows:
+        row = frames[offset : offset + count]
+        assert row[0].region.x == grid.region.x
+        assert row[-1].region.right == grid.region.right
+        assert all(frame.region.y == bottom for frame in row)
+        assert all(frame.region.bottom <= grid.region.bottom for frame in row)
+        assert max(frame.size.width for frame in row) - min(frame.size.width for frame in row) <= 1
+        for left, right in zip(row, row[1:], strict=False):
+            assert left.region.right + 1 == right.region.x
+        bottom = row[0].region.bottom
+        offset += count
+    assert offset == len(frames)
+    assert bottom == grid.region.bottom
+
+
+@pytest.mark.parametrize(
+    "count,size,rows",
+    [(3, (122, 58), (1, 2)), (4, (222, 58), (4,)), (5, (122, 58), (3, 2))],
+)
+async def test_auto_layout_fills_rows_using_the_actual_chart_area(count, size, rows):
+    app = TradingApp(DemoClient(), refresh_seconds=3600)
+    async with app.run_test(size=size) as pilot:
+        await settle(app, pilot)
+        assert app.query_one("#chart-layout", Select).value == "auto"
+        await pilot.press(f"ctrl+{count}")
+        await settle(app, pilot)
+        assert_full_chart_rows(app, rows)
+
+
+async def test_layout_selector_preserves_manual_presets_on_resize_and_restores_auto():
+    app = TradingApp(DemoClient(), refresh_seconds=3600)
+    async with app.run_test(size=(122, 58)) as pilot:
+        await settle(app, pilot)
+        await pilot.press("ctrl+3")
+        await settle(app, pilot)
+        frames = tuple(app.query(ChartFrame))
+        selector = app.query_one("#chart-layout", Select)
+        for mode, rows in (("horizontal", (3,)), ("grid", (1, 2)), ("vertical", (1, 1, 1))):
+            await pilot.press("l", "down", "enter")
+            await pilot.pause()
+            assert selector.value == mode
+            assert_full_chart_rows(app, rows)
+            await pilot.resize_terminal(242, 58)
+            await pilot.pause()
+            assert_full_chart_rows(app, rows)
+            await pilot.resize_terminal(122, 58)
+            await pilot.pause()
+            assert_full_chart_rows(app, rows)
+        selector.value = "auto"
+        await pilot.pause()
+        assert_full_chart_rows(app, (1, 2))
+        await pilot.resize_terminal(242, 58)
+        await pilot.pause()
+        assert_full_chart_rows(app, (3,))
+        assert tuple(app.query(ChartFrame)) == frames
+
+
+async def test_positions_auto_height_collapses_and_caps_with_table_scrolling():
+    source = LiveSource(empty=True)
+    app = TradingApp(source, refresh_seconds=3600)
+    async with app.run_test(size=(122, 40)) as pilot:
+        await settle(app, pilot)
+        await pilot.press("ctrl+3")
+        await settle(app, pilot)
+        pane = app.query_one("#positions-pane")
+        grid = app.query_one("#chart-grid")
+        table = app.query_one(DataTable)
+        assert not pane.display
+        full_height = grid.size.height
+        assert "0 positions" in str(app.query_one("#status", Static).render())
+        position = (await DemoClient().positions()).items[0]
+        for count in (1, 2, 3, 10, 15, 0):
+            app._set_positions(Positions([replace(position, id=str(i)) for i in range(count)]))
+            await pilot.pause()
+            assert pane.display == bool(count)
+            assert pane.region.height == (min(count + 4, 10) if count else 0)
+            assert grid.size.height == full_height - pane.region.height
+            assert grid.size.height >= 8
+            assert grid.region.bottom <= app.query_one("#status").region.y
+            assert_full_chart_rows(app, (1, 2) if count <= 1 else (3,))
+            if count > 3:
+                assert table.max_scroll_y > 0
+                table.scroll_end(animate=False)
+                await pilot.pause()
+                assert table.scroll_y > 0
+        assert app.focused is app._active_frame()
+
+
+async def test_small_positions_table_reserves_space_for_the_horizontal_scrollbar():
+    app = TradingApp(DemoClient(), refresh_seconds=3600)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await settle(app, pilot)
+        app._set_positions(Positions(app.positions[:1]))
+        await pilot.pause()
+        table = app.query_one(DataTable)
+        assert table.show_horizontal_scrollbar
+        assert app.query_one("#positions-pane").region.height == 6
+        assert table.size.height - table.scrollbar_size_horizontal >= 2
+        assert not table.show_vertical_scrollbar
+        await pilot.resize_terminal(122, 40)
+        await pilot.pause()
+        assert not table.show_horizontal_scrollbar
+        assert app.query_one("#positions-pane").region.height == 5
+
+
+async def test_positions_overrides_survive_updates_and_shift_p_returns_to_auto():
+    app = TradingApp(DemoClient(empty=True), refresh_seconds=3600)
+    async with app.run_test(size=(122, 40)) as pilot:
+        await settle(app, pilot)
+        pane = app.query_one("#positions-pane")
+        await pilot.press("p")
+        await pilot.pause()
+        assert pane.display and app._positions_override is True
+        await pilot.resize_terminal(122, 24)
+        app._set_positions(Positions([]))
+        await pilot.pause()
+        assert pane.display
+        await pilot.press("shift+p")
+        await pilot.pause()
+        assert app._positions_override is None and not pane.display
+        app._set_positions(await DemoClient().positions())
+        await pilot.pause()
+        assert pane.display and pane.region.height == 6
+        await pilot.press("escape", "p")
+        await pilot.pause()
+        assert not pane.display and app.focused is app._active_frame()
+        app._set_positions(await DemoClient().positions())
+        await pilot.pause()
+        assert not pane.display
+        await pilot.press("shift+p")
+        await pilot.pause()
+        assert pane.display and app._positions_override is None
+
+
+async def test_zero_position_errors_keep_a_small_warning_until_recovery():
+    app = TradingApp(DemoClient(empty=True), refresh_seconds=3600)
+    async with app.run_test(size=(122, 40)) as pilot:
+        await settle(app, pilot)
+        app._positions_error = "Connection failed"
+        app._render_positions()
+        await pilot.pause()
+        pane = app.query_one("#positions-pane")
+        assert pane.display and pane.region.height == 4
+        assert "unavailable" in str(app.query_one("#empty", Static).render())
+        app._set_positions(Positions([]))
+        await pilot.pause()
+        assert not pane.display
+
+
+async def test_layout_changes_preserve_charts_history_selection_maximize_and_connections():
+    source = LiveSource()
+    app = TradingApp(source, refresh_seconds=3600)
+    async with app.run_test(size=(122, 58)) as pilot:
+        await settle(app, pilot)
+        await pilot.press("ctrl+3")
+        await settle(app, pilot)
+        await pilot.press("2", "]")
+        await settle(app, pilot)
+        await pilot.press("left")
+        await pilot.pause()
+        active = app._active_extra
+        frames = tuple(app.query(ChartFrame))
+        charts = tuple(frame.query_one(CandleChart) for frame in frames)
+        cursor = active.query_one(CandleChart).cursor_time
+        market = active.market
+        connections = set(source.connections)
+        tasks = (app._stream_task, *(panel._stream_task for panel in app.query(ExtraChart)))
+
+        await pilot.resize_terminal(242, 58)
+        await pilot.pause()
+        assert_full_chart_rows(app, (3,))
+        await pilot.press("z")
+        await pilot.pause()
+        assert app._maximized
+        app.query_one("#chart-layout", Select).value = "vertical"
+        app._set_positions(Positions([]))
+        await pilot.resize_terminal(122, 40)
+        await pilot.pause()
+        assert app._maximized and active.display
+        assert [frame for frame in frames if frame.display] == [active]
+        assert active.region == app.query_one("#chart-grid").region
+        await pilot.press("z")
+        await pilot.pause()
+        assert not app._maximized
+        assert_full_chart_rows(app, (1, 1, 1))
+        assert tuple(app.query(ChartFrame)) == frames
+        assert tuple(frame.query_one(CandleChart) for frame in frames) == charts
+        assert app._active_extra is active and app.focused is active
+        assert active.interval == "30m" and active.market is market
+        assert active.query_one(CandleChart).cursor_time == cursor and cursor is not None
+        assert set(source.connections) == connections
+        assert (app._stream_task, *(panel._stream_task for panel in app.query(ExtraChart))) == tasks

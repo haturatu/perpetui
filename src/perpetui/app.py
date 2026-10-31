@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import math
 from collections.abc import Callable
 from contextlib import aclosing, suppress
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
+from math import lcm
 
 from rich.text import Text
 from textual import on, work
@@ -17,6 +17,7 @@ from textual.containers import Grid, Horizontal, Vertical
 from textual.coordinate import Coordinate
 from textual.widgets import DataTable, Footer, Input, Select, Static
 
+from .adaptive_grid import AdaptiveGrid
 from .chart import ACCENT, DOWN, MUTED, UP, CandleChart
 from .chart_panel import ChartFrame, ExtraChart
 from .client import DataSource
@@ -25,6 +26,7 @@ from .errors import ExchangeError
 from .help import HelpScreen
 from .history import CandleStore
 from .i18n import _
+from .layout import LAYOUT_MODES, LayoutMode, choose_layout
 from .models import INTERVALS, Market, Position, Positions, compact, price
 from .search import SymbolSearch
 
@@ -47,7 +49,8 @@ class TradingApp(App[None]):
     #connection { width: auto; color: #788ba9; }
     #exchange { width: 18; height: 1; margin: 0 1; }
     #chart-count { width: 7; height: 1; margin: 0 1; }
-    #exchange > SelectCurrent, #chart-count > SelectCurrent {
+    #chart-layout { width: 16; height: 1; margin: 0 1; }
+    #exchange > SelectCurrent, #chart-count > SelectCurrent, #chart-layout > SelectCurrent {
         height: 1; border: none; padding: 0 1; }
     #market-summary { height: 3; padding: 0 2; content-align: left middle; }
     #toolbar { height: 3; padding: 0 1; }
@@ -62,7 +65,7 @@ class TradingApp(App[None]):
         border: round #233149; padding: 0 1; border-title-color: #aebfd8; }
     .chart-frame.active { border: round #7aa2ff; }
     CandleChart { height: 1fr; }
-    #positions-pane { height: 10; margin: 0 1; border: round #233149;
+    #positions-pane { height: auto; min-height: 0; margin: 0 1; border: round #233149;
         border-title-color: #aebfd8; }
     #positions-summary { height: 1; padding: 0 1; color: #788ba9; }
     DataTable { height: 1fr; background: #080e18; }
@@ -74,7 +77,6 @@ class TradingApp(App[None]):
     #status.error { color: #fb7185; }
     Footer { background: #101a2a; }
     Footer > .footer--key { background: #192d49; color: #b6cdff; }
-    Screen.compact #positions-pane { height: 7; }
     Screen.compact #topbar { height: 1; border: none; }
     Screen.compact #market-summary { height: 2; }
     Screen.compact #candle-info { display: none; }
@@ -122,6 +124,8 @@ class TradingApp(App[None]):
         Binding("s", "toggle_cursor_sync", "Sync time", show=False),
         Binding("z", "maximize", "Maximize", show=False),
         Binding("p", "toggle_positions", "Positions", show=False),
+        Binding("shift+p", "auto_positions", "Auto positions", show=False),
+        Binding("l", "layout", "Layout", show=False),
         Binding("ctrl+up", "time_zoom(1)", "Time zoom out", show=False),
         Binding("ctrl+down", "time_zoom(-1)", "Time zoom in", show=False),
         Binding("question_mark", "help", "Help"),
@@ -158,7 +162,9 @@ class TradingApp(App[None]):
         self._all_timeframes = False
         self._cursor_sync = False
         self._maximized = False
-        self._positions_visible = True
+        self._layout_mode: LayoutMode = "auto"
+        self._layout_signature: tuple[tuple[int, ...], tuple[ChartFrame, ...]] | None = None
+        self._positions_override: bool | None = None
         self._all_interval_timer = None
         self._pending_interval: str | None = None
         self._syncing_cursor = False
@@ -222,6 +228,14 @@ class TradingApp(App[None]):
                 id="chart-count",
                 tooltip=_("Charts"),
             )
+            yield Select(
+                [(_(mode.title()), mode) for mode in LAYOUT_MODES],
+                value=self._layout_mode,
+                allow_blank=False,
+                compact=True,
+                id="chart-layout",
+                tooltip=_("Chart layout"),
+            )
             yield Static(Text(self.client.label), id="connection")
         yield Static(_("Loading market…"), id="market-summary")
         with Horizontal(id="toolbar"):
@@ -233,7 +247,7 @@ class TradingApp(App[None]):
                 id="timeframe",
             )
             yield Static("", id="candle-info")
-        with Grid(id="chart-grid"):
+        with AdaptiveGrid(id="chart-grid"):
             with ChartFrame(id="chart-pane", classes="chart-frame active"):
                 yield CandleChart(id="chart")
         with Vertical(id="positions-pane"):
@@ -246,6 +260,9 @@ class TradingApp(App[None]):
     def on_mount(self) -> None:
         self.query_one("#positions-pane").border_title = " " + _("OPEN POSITIONS") + " "
         self._setup_table()
+        self.watch(
+            self.query_one(DataTable), "show_horizontal_scrollbar", self._update_positions_layout
+        )
         self.action_positions()
         self._title_chart()
         self._load_initial_data()
@@ -258,9 +275,7 @@ class TradingApp(App[None]):
             selector.value = self.interval
 
     def _setup_table(self) -> None:
-        self.query_one("#positions-pane").display = (
-            self.client.authenticated and self._positions_visible
-        )
+        self._update_positions_layout()
         table = self.query_one(DataTable)
         with table.prevent(DataTable.RowHighlighted):
             table.clear(columns=True)
@@ -314,6 +329,37 @@ class TradingApp(App[None]):
 
     def on_resize(self) -> None:
         self.screen.set_class(self.size.height < 32, "compact")
+        if self.query("#positions-pane"):
+            self._update_positions_layout()
+
+    @on(AdaptiveGrid.Resized)
+    def chart_grid_resized(self) -> None:
+        if not self._closing:
+            self._apply_adaptive_layout()
+
+    def _apply_adaptive_layout(self) -> None:
+        if self._maximized:
+            return
+        grid = self.query_one("#chart-grid", Grid)
+        frames = tuple(self.query(ChartFrame))
+        if not frames or grid.size.width <= 0 or grid.size.height <= 0:
+            return
+        rows = choose_layout(len(frames), grid.size.width, grid.size.height, self._layout_mode)
+        signature = (rows, frames)
+        if self._layout_signature == signature:
+            return
+        columns = lcm(*rows)
+        grid.styles.grid_size_columns = columns
+        grid.styles.grid_size_rows = len(rows)
+        grid.styles.grid_columns = " ".join(["1fr"] * columns)
+        grid.styles.grid_rows = " ".join(["1fr"] * len(rows))
+        offset = 0
+        for count in rows:
+            for frame in frames[offset : offset + count]:
+                frame.styles.column_span = columns // count
+                frame.styles.row_span = 1
+            offset += count
+        self._layout_signature = signature
 
     async def on_unmount(self) -> None:
         self._closing = True
@@ -426,10 +472,7 @@ class TradingApp(App[None]):
                         autoload=self._initial_selection or not self.client.authenticated,
                     )
                 )
-        columns = math.ceil(math.sqrt(count))
-        grid = self.query_one("#chart-grid", Grid)
-        grid.styles.grid_size_columns = columns
-        grid.styles.grid_size_rows = math.ceil(count / columns)
+        self._apply_maximized_layout()
 
     async def _remove_extra_charts(self) -> None:
         self._select_chart(None)
@@ -473,6 +516,18 @@ class TradingApp(App[None]):
     def chart_count_changed(self, event: Select.Changed) -> None:
         if isinstance(event.value, int) and event.value != self._desired_chart_count:
             self.action_chart_count(event.value)
+
+    def action_layout(self) -> None:
+        selector = self.query_one("#chart-layout", Select)
+        selector.focus()
+        selector.expanded = True
+
+    @on(Select.Changed, "#chart-layout")
+    def chart_layout_changed(self, event: Select.Changed) -> None:
+        if event.value in LAYOUT_MODES:
+            self._layout_mode = event.value
+            self._layout_signature = None
+            self._apply_adaptive_layout()
 
     def action_exchange(self) -> None:
         selector = self.query_one("#exchange", Select)
@@ -891,6 +946,25 @@ class TradingApp(App[None]):
                 summary.append("  ·  " + _("uPnL") + " ")
                 summary.append_text(signed(pnl, " " + settlement))
         self.query_one("#positions-summary", Static).update(summary)
+        self._update_positions_layout()
+
+    def _update_positions_layout(self) -> None:
+        pane = self.query_one("#positions-pane")
+        table = self.query_one(DataTable)
+        count = len(self.positions)
+        visible = self.client.authenticated and (
+            self._positions_override
+            if self._positions_override is not None
+            else bool(count or self._positions_error or not self._initial_selection)
+        )
+        max_height = min(12, max(5, self.size.height // 4))
+        # A horizontal scrollbar also consumes a table row on narrow terminals.
+        scrollbar_height = table.scrollbar_size_horizontal if count else 0
+        pane.styles.height = min(count + 4 + scrollbar_height if count else 4, max_height)
+        # Move focus before hiding its parent so Textual doesn't select another control.
+        if not visible and self.focused is table:
+            self._active_frame().focus()
+        pane.display = visible
 
     def _status(self) -> None:
         if not self._view_ready() or not self.query("#status"):
@@ -915,6 +989,8 @@ class TradingApp(App[None]):
             )
         if self._quote_warning:
             message += " · " + self._quote_warning
+        if self.client.authenticated:
+            message += " · " + _("{count} positions", count=len(self.positions))
         flags = []
         if self._all_timeframes:
             flags.append(_("ALL TF: ON"))
@@ -1168,6 +1244,7 @@ class TradingApp(App[None]):
         self._status()
 
     def _apply_maximized_layout(self) -> None:
+        self._layout_signature = None
         active = self._active_frame()
         for frame in self.query(ChartFrame):
             frame.display = not self._maximized or frame is active
@@ -1175,22 +1252,29 @@ class TradingApp(App[None]):
         if self._maximized:
             grid.styles.grid_size_columns = 1
             grid.styles.grid_size_rows = 1
+            grid.styles.grid_columns = "1fr"
+            grid.styles.grid_rows = "1fr"
+            for frame in self.query(ChartFrame):
+                frame.styles.column_span = 1
+                frame.styles.row_span = 1
             return
-        columns = math.ceil(math.sqrt(self._chart_count))
-        grid.styles.grid_size_columns = columns
-        grid.styles.grid_size_rows = math.ceil(self._chart_count / columns)
+        self._apply_adaptive_layout()
 
     def action_toggle_positions(self) -> None:
         if not self.client.authenticated or self._switching:
             return
-        pane = self.query_one("#positions-pane")
-        pane.display = not pane.display
-        self._positions_visible = pane.display
+        self._positions_override = not self.query_one("#positions-pane").display
+        self._update_positions_layout()
+
+    def action_auto_positions(self) -> None:
+        self._positions_override = None
+        self._update_positions_layout()
 
     def action_help(self) -> None:
         rows = [
             ("1–9", _("Select chart")),
             ("Ctrl+1–9", _("Chart count")),
+            ("l", _("Chart layout")),
             ("← / →", _("Previous / next candle")),
             ("Shift+← / →", _("Move 5 candles")),
             ("Home / End", _("Oldest candle / live")),
@@ -1204,6 +1288,7 @@ class TradingApp(App[None]):
             ("v", _("Candle style")),
             ("z", _("Maximize the selected chart")),
             ("p", _("Show / hide positions")),
+            ("Shift+P", _("Automatically size and hide positions")),
             ("/", _("Symbol search")),
             ("e", _("Exchange")),
             ("r", _("Refresh")),
