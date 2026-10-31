@@ -8,6 +8,11 @@ import (
 	"runtime"
 )
 
+// InstalledPython is embedded by `make install` with -ldflags. When set, an
+// installed launcher only uses that interpreter and never searches arbitrary
+// directories for a development .venv.
+var InstalledPython string
+
 // Error describes a launcher failure with the exit code the CLI should return.
 type Error struct {
 	Code    int
@@ -20,9 +25,9 @@ func (e *Error) Error() string { return e.Message }
 //
 // The lookup order is:
 //  1. PERPETUI_PYTHON (explicit override)
-//  2. $XDG_DATA_HOME/perpetui/venv (or ~/.local/share) from `make install`
-//  3. .venv next to the repository checkout, found relative to the executable
-//  4. .venv in the current working directory
+//  2. The path embedded by `make install` (installed binaries)
+//  3. .venv next to the development checkout
+//  4. .venv in the current working directory (development only)
 func FindPython() (string, error) {
 	if override := os.Getenv("PERPETUI_PYTHON"); override != "" {
 		if executable(override) {
@@ -31,21 +36,26 @@ func FindPython() (string, error) {
 		return "", &Error{127, fmt.Sprintf("PERPETUI_PYTHON is not executable: %s", override)}
 	}
 
+	if InstalledPython != "" {
+		if executable(InstalledPython) {
+			return InstalledPython, nil
+		}
+		return "", &Error{
+			127,
+			fmt.Sprintf(
+				"installed Python environment not found: %s; run `make install` again",
+				InstalledPython,
+			),
+		}
+	}
+
 	candidates := []string{}
-	if dataHome := os.Getenv("XDG_DATA_HOME"); dataHome != "" {
-		candidates = append(candidates, pythonIn(filepath.Join(dataHome, "perpetui", "venv")))
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		candidates = append(candidates, pythonIn(filepath.Join(home, ".local", "share", "perpetui", "venv")))
-	}
 	if executablePath, err := os.Executable(); err == nil {
 		if resolved, err := filepath.EvalSymlinks(executablePath); err == nil {
 			executablePath = resolved
 		}
 		dir := filepath.Dir(executablePath)
-		prefix := filepath.Dir(dir)
-		candidates = append(candidates, pythonIn(filepath.Join(prefix, "share", "perpetui", "venv")))
-		for _, root := range []string{dir, prefix, filepath.Dir(prefix)} {
+		for _, root := range []string{dir, filepath.Dir(dir), filepath.Dir(filepath.Dir(dir))} {
 			candidates = append(candidates, pythonIn(filepath.Join(root, ".venv")))
 		}
 	}
@@ -65,7 +75,7 @@ func FindPython() (string, error) {
 	}
 	return "", &Error{
 		127,
-		"Python environment not found; run `make install` or set PERPETUI_PYTHON",
+		"development Python environment not found; run `make setup` or set PERPETUI_PYTHON",
 	}
 }
 
@@ -78,5 +88,9 @@ func pythonIn(venv string) string {
 
 func executable(path string) bool {
 	info, err := os.Stat(path)
-	return err == nil && !info.IsDir() && info.Mode()&0o111 != 0
+	if err != nil || info.IsDir() {
+		return false
+	}
+	// Windows does not use Unix execute bits for normal files.
+	return runtime.GOOS == "windows" || info.Mode()&0o111 != 0
 }
