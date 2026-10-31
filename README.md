@@ -25,7 +25,58 @@
 
 # perpetui
 
-Hyperliquid・Lighter・MEXC の先物チャート・保有ポジションを表示する Python 製 TUI です。
+Hyperliquid・Lighter・MEXC の先物チャート・保有ポジションを表示する Python 製 TUI です。  
+`make install` の場合、`~/.local/bin/perpetui` 配下にGoでビルドされたラッパーバイナリ経由で起動できます。  
+
+```sh
+$ man perpetui
+```
+
+or
+
+```sh
+$ perpetui -h
+perpetui is a read-only terminal dashboard for Hyperliquid, Lighter and MEXC perpetual charts and open positions.
+
+Usage:
+  perpetui [flags]
+  perpetui [command]
+
+Available Commands:
+  completion  Generate shell completion scripts
+  docs        Generate documentation
+  help        Help about any command
+
+Flags:
+      --account string                 Saved account alias (default: saved default)
+      --debug                          Enable DEBUG / INFO logs on stdout
+      --demo                           Use sample data, without network access
+      --demo-empty                     Demo with no positions (BTC chart)
+      --exchange string                Exchange: hyperliquid, hl, lighter, lt or mexc (default "hyperliquid")
+      --futures-base-url string        Override the MEXC HTTP endpoint
+  -h, --help                           help for perpetui
+      --hl-command string              Original hl command path for account decryption
+      --hyperliquid-base-url string    Override the Hyperliquid HTTP endpoint
+      --install-konsole-keymap         Install the optional Konsole Ctrl+number keymap
+      --interval string                Initial candle interval (default "15m")
+      --lang string                    UI language: en or ja (default: system locale)
+      --lighter-account-index string   Lighter account index (overrides the saved account)
+      --lighter-base-url string        Override the Lighter HTTP endpoint
+      --lighter-config string          Lighter account database path (default: lighter CLI config)
+      --mexc-command string            Original mexc command path for account decryption
+      --no-websocket                   Use REST polling for charts and positions
+      --public                         Market data only; skip account lookup
+      --refresh float                  REST fallback refresh interval in seconds (default 5)
+      --symbol string                  Initial symbol, e.g. BTC, ETH_USDT or xyz:CL
+      --testnet                        Use the selected exchange's testnet (Hyperliquid or Lighter)
+      --timeout float                  Network timeout in seconds (default 10)
+  -v, --version                        version for perpetui
+      --wallet-address string          Hyperliquid monitoring address (no private key required)
+      --websocket-url string           Override the selected exchange's WebSocket endpoint
+
+Use "perpetui [command] --help" for more information about a command.
+```
+
 
 ![デモ画面（サンプルデータ）](docs/demo.png)
 
