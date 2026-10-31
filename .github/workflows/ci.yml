@@ -24,10 +24,67 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.23"
+          go-version: "1.27.3"
       - run: go vet ./...
       - run: test -z "$(gofmt -l cmd internal)"
       - run: go test ./...
       - run: go build -trimpath -o build/perpetui ./cmd/perpetui
       - run: ./build/perpetui completion bash > /dev/null
       - run: ./build/perpetui docs man --dir build/man/man1
+
+  security:
+    name: Security and dependency audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.3"
+          cache: true
+          cache-dependency-path: "**/go.sum"
+      - name: Run race detector
+        run: go test -race ./...
+      - name: Run govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Sync locked dependencies
+        run: uv sync --locked --dev
+      - name: Audit Python dependencies
+        run: |
+          uv export --locked --no-dev --no-emit-project --no-hashes \
+            --format requirements-txt > /tmp/perpetui-requirements.txt
+          uvx pip-audit -r /tmp/perpetui-requirements.txt
+      - name: Static security scan
+        run: uvx bandit -q -r src/perpetui
+
+  container-scan:
+    name: Container scan
+    needs: go
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: perpetui:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          image-ref: perpetui:ci
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
