@@ -215,7 +215,7 @@ async def test_live_stream_updates_chart_without_polling_and_stops_on_selection_
         await pilot.pause(0.6)
         assert app.market is update
         assert app.query_one(CandleChart).market is update
-        assert app._stream_state == "live"
+        assert app.charts[0].state.connection == "live"
         assert "WS" not in str(app.query_one("#status", Static).render())
         assert client.market_calls == initial_calls
         assert client.position_calls >= 2
@@ -228,7 +228,7 @@ async def test_live_stream_updates_chart_without_polling_and_stops_on_selection_
         assert client.active == {("BTC_USDT", "30m")}
         assert ("BTC_USDT", "15m") in client.stopped
     assert not client.active
-    assert app._stream_task is None
+    assert app.charts[0].stream_task is None
 
 
 async def test_reconnecting_uses_rest_fallback_without_restarting_the_socket():
@@ -236,12 +236,12 @@ async def test_reconnecting_uses_rest_fallback_without_restarting_the_socket():
     app = TradingApp(client, refresh_seconds=0.25)
     async with app.run_test(size=(120, 40)) as pilot:
         await settle(app, pilot)
-        stream_task = app._stream_task
+        stream_task = app.charts[0].stream_task
         await client.queue.put(MarketEvent("reconnecting"))
         await pilot.pause(0.6)
         assert client.market_calls >= 2
-        assert app._stream_task is stream_task
-        assert app._stream_state == "reconnecting"
+        assert app.charts[0].stream_task is stream_task
+        assert app.charts[0].state.connection == "reconnecting"
         assert "REST" not in str(app.query_one("#status", Static).render())
         assert app.market is not None
         assert not client.stopped

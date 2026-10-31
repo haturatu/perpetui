@@ -145,5 +145,5 @@ async def test_provider_errors_are_caught_and_shown_in_the_selected_language():
         await pilot.pause()
         assert app.symbol == "BTC"
         assert "更新停止" in str(app.query_one("#status", Static).render())
-        assert "ポジション取得失敗" in app._positions_error
-        assert "チャート取得失敗" in app._market_error
+        assert "ポジション取得失敗" in app.positions_service.error
+        assert "チャート取得失敗" in app.charts[0].state.error

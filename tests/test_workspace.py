@@ -125,7 +125,8 @@ async def test_switch_to_public_hides_positions_and_switch_back_restores_them():
         assert not app.query_one("#positions-pane").display
         assert app.query_one("#chart-grid").region.height > original_height
         assert app.market.symbol == "BTC" and app.positions == []
-        assert len(created[0].connections) == 2
+        assert app.query_one("#chart", CandleChart).entry is None
+        assert len(created[0].connections) == 1
         assert "Positions" not in str(app.query_one("#status", Static).render())
         await pilot.press("e", "up", "enter")
         await settle(app, pilot)
@@ -159,7 +160,7 @@ async def test_exchange_selector_replaces_units_symbols_and_closes_old_connectio
         assert app.symbol == app.market.symbol == "ETH"
         assert list(app.query_one(DataTable).columns.values())[2].label.plain == "Size"
         assert "xyz:CL" in app.query_one(SymbolSearch).symbols
-        assert app._stream_state == app._positions_stream_state == "live"
+        assert app.charts[0].state.connection == app.positions_service.connection == "live"
         await pilot.press("e", "up", "enter")
         await settle(app, pilot)
         assert created[0].closed
@@ -237,7 +238,7 @@ async def test_chart_count_shortcuts_focus_and_per_pane_symbol_timeframe_and_zoo
         await pilot.press("ctrl+4")
         await settle(app, pilot)
         assert len(app.query(ChartFrame)) == 4
-        assert len(source.connections) == 5  # Four markets and one portfolio.
+        assert len(source.connections) == 4  # Three unique markets and one portfolio.
         second = app.query_one("#chart-pane-2", ExtraChart)
         assert second.symbol == "BTC_USDT"
         await pilot.click("#chart-pane-2")
@@ -269,7 +270,7 @@ async def test_rapid_count_changes_and_removing_selected_panes_do_not_leak_conne
         await settle(app, pilot)
         await pilot.press("ctrl+9")
         await settle(app, pilot)
-        assert len(app.query(ChartFrame)) == 9 and len(source.connections) == 10
+        assert len(app.query(ChartFrame)) == 9 and len(source.connections) == 4
         await pilot.click("#chart-pane-9")
         await pilot.press("ctrl+2", "ctrl+4", "ctrl+1")
         await settle(app, pilot)
@@ -304,7 +305,7 @@ async def test_exchange_switch_rebuilds_all_panes_and_preserves_count_and_timefr
         assert all(
             panel.market and "_USDT" not in panel.market.symbol for panel in app.query(ExtraChart)
         )
-        assert len(targets[0].connections) == 5
+        assert len(targets[0].connections) == 4
         second = app.query_one("#chart-pane-2", ExtraChart)
         assert second.interval == "1h" and second.query_one(CandleChart).price_zoom == 2
         assert not second.query_one(CandleChart).detail
@@ -317,7 +318,7 @@ async def test_ui_hides_transport_details_while_live_and_reconnecting():
     async with app.run_test() as pilot:
         await settle(app, pilot)
         for state in ("live", "reconnecting"):
-            app._stream_state = app._positions_stream_state = state
+            app.charts[0].state.connection = app.positions_service.connection = state
             app._status()
             visible = (
                 str(app.query_one("#status", Static).render())
@@ -415,7 +416,7 @@ async def test_all_chart_sync_cursor_sync_maximize_positions_and_help():
         assert app.interval == "15m"
         await pilot.press("]", "a")
         await settle(app, pilot)
-        assert app._all_timeframes and app.interval == "30m"
+        assert app.workspace.all_timeframes and app.interval == "30m"
         assert [panel.interval for panel in app.query(ExtraChart)] == ["30m", "30m"]
         await pilot.press("]")
         await pilot.pause(0.25)
@@ -425,7 +426,7 @@ async def test_all_chart_sync_cursor_sync_maximize_positions_and_help():
 
         await pilot.press("2", "left", "s")
         await pilot.pause()
-        assert app._cursor_sync
+        assert app.workspace.cursor_sync
         charts = [panel.query_one(CandleChart) for panel in app.query(ExtraChart)]
         assert all(chart.cursor_time is not None for chart in charts)
         assert charts[0].cursor_time == charts[1].cursor_time
@@ -433,11 +434,11 @@ async def test_all_chart_sync_cursor_sync_maximize_positions_and_help():
         active = app._active_extra
         await pilot.press("z")
         await pilot.pause()
-        assert app._maximized
+        assert app.workspace.maximized
         assert active.display and not app.query_one("#chart-pane").display
         await pilot.press("z")
         await pilot.pause()
-        assert not app._maximized and app.query_one("#chart-pane").display
+        assert not app.workspace.maximized and app.query_one("#chart-pane").display
 
         await pilot.press("p")
         await pilot.pause()
@@ -623,14 +624,14 @@ async def test_positions_overrides_survive_updates_and_shift_p_returns_to_auto()
         pane = app.query_one("#positions-pane")
         await pilot.press("p")
         await pilot.pause()
-        assert pane.display and app._positions_override is True
+        assert pane.display and app.workspace.positions_override is True
         await pilot.resize_terminal(122, 24)
         app._set_positions(Positions([]))
         await pilot.pause()
         assert pane.display
         await pilot.press("shift+p")
         await pilot.pause()
-        assert app._positions_override is None and not pane.display
+        assert app.workspace.positions_override is None and not pane.display
         app._set_positions(await DemoClient().positions())
         await pilot.pause()
         assert pane.display and pane.region.height == 6
@@ -642,14 +643,14 @@ async def test_positions_overrides_survive_updates_and_shift_p_returns_to_auto()
         assert not pane.display
         await pilot.press("shift+p")
         await pilot.pause()
-        assert pane.display and app._positions_override is None
+        assert pane.display and app.workspace.positions_override is None
 
 
 async def test_zero_position_errors_keep_a_small_warning_until_recovery():
     app = TradingApp(DemoClient(empty=True), refresh_seconds=3600)
     async with app.run_test(size=(122, 40)) as pilot:
         await settle(app, pilot)
-        app._positions_error = "Connection failed"
+        app.positions_service.error = "Connection failed"
         app._render_positions()
         await pilot.pause()
         pane = app.query_one("#positions-pane")
@@ -677,24 +678,27 @@ async def test_layout_changes_preserve_charts_history_selection_maximize_and_con
         cursor = active.query_one(CandleChart).cursor_time
         market = active.market
         connections = set(source.connections)
-        tasks = (app._stream_task, *(panel._stream_task for panel in app.query(ExtraChart)))
+        tasks = (
+            app.charts[0].stream_task,
+            *(panel.session.stream_task for panel in app.query(ExtraChart)),
+        )
 
         await pilot.resize_terminal(242, 58)
         await pilot.pause()
         assert_full_chart_rows(app, (3,))
         await pilot.press("z")
         await pilot.pause()
-        assert app._maximized
+        assert app.workspace.maximized
         app.query_one("#chart-layout", Select).value = "vertical"
         app._set_positions(Positions([]))
         await pilot.resize_terminal(122, 40)
         await pilot.pause()
-        assert app._maximized and active.display
+        assert app.workspace.maximized and active.display
         assert [frame for frame in frames if frame.display] == [active]
         assert active.region == app.query_one("#chart-grid").region
         await pilot.press("z")
         await pilot.pause()
-        assert not app._maximized
+        assert not app.workspace.maximized
         assert_full_chart_rows(app, (1, 1, 1))
         assert tuple(app.query(ChartFrame)) == frames
         assert tuple(frame.query_one(CandleChart) for frame in frames) == charts
@@ -702,4 +706,40 @@ async def test_layout_changes_preserve_charts_history_selection_maximize_and_con
         assert active.interval == "30m" and active.market is market
         assert active.query_one(CandleChart).cursor_time == cursor and cursor is not None
         assert set(source.connections) == connections
-        assert (app._stream_task, *(panel._stream_task for panel in app.query(ExtraChart))) == tasks
+        assert (
+            app.charts[0].stream_task,
+            *(panel.session.stream_task for panel in app.query(ExtraChart)),
+        ) == tasks
+
+
+async def test_shared_feed_keeps_view_state_and_position_entries_when_a_duplicate_pane_closes():
+    source = LiveSource()
+    app = TradingApp(source, refresh_seconds=3600)
+    async with app.run_test(size=(160, 58)) as pilot:
+        await settle(app, pilot)
+        await pilot.press("ctrl+4")
+        await settle(app, pilot)
+        first = app.query_one("#chart", CandleChart)
+        duplicate = app.query_one("#chart-pane-4", ExtraChart)
+        assert duplicate.symbol == app.symbol
+        connections = set(source.connections)
+        await pilot.press("4", "left", "plus", "v")
+        await pilot.pause()
+        chart = duplicate.query_one(CandleChart)
+        cursor = chart.cursor_time
+        updated_positions = Positions([replace(p, entry=p.entry + 1) for p in app.positions])
+        app._set_positions(updated_positions)
+        await pilot.pause()
+        entry = first.entry
+        update = replace(app.market, last=Decimal("999"))
+        await source.emit(update)
+        await pilot.pause()
+        assert app.market is duplicate.market is update
+        assert first.entry == entry and entry is not None
+        assert chart.cursor_time == cursor and cursor is not None
+        assert chart.price_zoom == 2 and not chart.detail
+        assert first.cursor_time is None and first.price_zoom == 1 and first.detail
+        await pilot.press("ctrl+3")
+        await settle(app, pilot)
+        assert set(source.connections) == connections
+        assert first.market is update

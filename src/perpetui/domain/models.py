@@ -9,9 +9,9 @@ def number(value: object) -> Decimal:
     try:
         result = Decimal(str(value))
     except InvalidOperation as exc:
-        raise ValueError("Invalid numeric data from MEXC") from exc
+        raise ValueError("Invalid numeric data from exchange") from exc
     if not result.is_finite():
-        raise ValueError("Non-finite numeric data from MEXC")
+        raise ValueError("Non-finite numeric data from exchange")
     return result
 
 

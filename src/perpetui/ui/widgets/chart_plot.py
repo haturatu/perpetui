@@ -15,26 +15,7 @@ from perpetui.domain.intervals import INTERVAL_SECONDS
 from perpetui.domain.models import Candle, Market
 from perpetui.i18n import _
 from perpetui.ui.formatting import price
-
-UP = "#2dd4bf"
-
-
-DOWN = "#fb7185"
-
-
-MUTED = "#788ba9"
-
-
-GRID = "#233149"
-
-
-ACCENT = "#7aa2ff"
-
-
-ENTRY = "#e7bd68"
-
-
-BACKGROUND = (8, 14, 24)
+from perpetui.ui.theme import ACCENT, BACKGROUND, DOWN, ENTRY, GRID, MUTED, UP
 
 
 def _rgb(color: str) -> tuple[int, int, int]:

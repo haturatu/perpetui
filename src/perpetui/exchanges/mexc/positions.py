@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from typing import Any
 
 from perpetui.domain.models import Position, Positions, number
+from perpetui.errors import MEXCError
 from perpetui.i18n import _
 
 
@@ -135,3 +137,55 @@ class PositionBook:
         self.items[key] = position
         self.versions[key] = (version or old_version, stamp or old_stamp)
         return position != previous
+
+
+class MEXCPositions:
+    async def positions(self) -> Positions:
+        if not self.authenticated:
+            return Positions([])
+        data = await self._get("/api/v1/private/position/open_positions", signed=True)
+        try:
+            if not isinstance(data, list):
+                raise ValueError("Positions must be an array")
+            positions = [
+                parse_position(row)
+                for row in data
+                if number(row["holdVol"]) > 0 and int(row.get("state", 1)) in (1, 2)
+            ]
+        except (KeyError, ValueError, TypeError) as exc:
+            raise MEXCError("Invalid positions data from MEXC") from exc
+        if not positions:
+            return Positions([])
+        # Fetch all quotes and metadata once, rather than two requests per position.
+        quotes, details = await asyncio.gather(
+            self._get("/api/v1/contract/ticker"),
+            self._contract_details(),
+            return_exceptions=True,
+        )
+        tickers = (
+            {row["symbol"]: row for row in quotes if isinstance(row, dict) and "symbol" in row}
+            if isinstance(quotes, list)
+            else {}
+        )
+        metadata = details if isinstance(details, dict) else {}
+        enriched, missing = [], []
+        for position in positions:
+            try:
+                detail = metadata[position.symbol]
+                enriched.append(
+                    replace(
+                        position,
+                        mark=number(tickers[position.symbol]["fairPrice"]),
+                        contract_size=number(detail["contractSize"]),
+                        settlement=str(detail.get("settleCoin", position.settlement)),
+                    )
+                )
+            except (KeyError, ValueError, TypeError):
+                enriched.append(position)
+                missing.append(position.symbol)
+        warnings = (
+            (_("Mark / PnL unavailable: {symbols}", symbols=", ".join(dict.fromkeys(missing))),)
+            if missing
+            else ()
+        )
+        return Positions(enriched, warnings)

@@ -49,7 +49,7 @@ async def test_live_positions_revalue_all_rows_and_totals_without_rest_or_cursor
     app = TradingApp(client, refresh_seconds=0.15)
     async with app.run_test(size=(80, 24)) as pilot:
         await settle(app, pilot)
-        assert app._positions_stream_state == "live"
+        assert app.positions_service.connection == "live"
         await pilot.press("down")
         await settle(app, pilot)
         table = app.query_one(DataTable)
@@ -72,7 +72,7 @@ async def test_live_positions_revalue_all_rows_and_totals_without_rest_or_cursor
         assert f"{total:+,.2f}" in str(app.query_one("#positions-summary", Static).render())
         assert app.query_one("#positions-pane").border_title == " OPEN POSITIONS "
     assert client.active == 0 and client.stopped == 1
-    assert app._positions_stream_task is None
+    assert app.positions_service.stream_task is None
 
 
 async def test_new_resized_and_closed_positions_update_rows_and_chart_entry():
@@ -106,14 +106,14 @@ async def test_chart_switches_leave_position_stream_running_and_manual_refresh_r
     app = TradingApp(client, refresh_seconds=3600)
     async with app.run_test() as pilot:
         await settle(app, pilot)
-        task = app._positions_stream_task
+        task = app.positions_service.stream_task
         await pilot.press("down", "]")
         await settle(app, pilot)
-        assert app._positions_stream_task is task
+        assert app.positions_service.stream_task is task
         assert client.active == 1 and client.stopped == 0
         await pilot.press("r")
         await settle(app, pilot)
-        assert app._positions_stream_task is not task
+        assert app.positions_service.stream_task is not task
         assert client.active == 1 and client.stopped == 1
         assert app.symbol == "BTC_USDT"
     assert client.stopped == 2
@@ -124,18 +124,18 @@ async def test_reconnecting_positions_poll_rest_without_restarting_stream():
     app = TradingApp(client, refresh_seconds=0.1)
     async with app.run_test() as pilot:
         await settle(app, pilot)
-        task = app._positions_stream_task
+        task = app.positions_service.stream_task
         initial_calls = client.position_calls
         await client.queue.put(PositionsEvent("reconnecting"))
         await pilot.pause(0.35)
         assert client.position_calls > initial_calls
-        assert app._positions_stream_task is task
-        assert app._positions_stream_state == "reconnecting"
+        assert app.positions_service.stream_task is task
+        assert app.positions_service.connection == "reconnecting"
         snapshot = Positions([replace(app.positions[0], mark=Decimal(4000))])
         await client.queue.put(PositionsEvent("live", snapshot))
         await pilot.pause()
         assert app.positions == snapshot.items
-        assert app._positions_stream_state == "live"
+        assert app.positions_service.connection == "live"
         assert app.query_one("#positions-pane").border_title == " OPEN POSITIONS "
 
 
@@ -172,5 +172,5 @@ async def test_late_fallback_cannot_overwrite_recovered_position_stream(fail):
         client.release.set()
         await worker.wait()
         assert app.positions == update.items
-        assert not app._positions_error
+        assert not app.positions_service.error
         assert not app.query_one("#status").has_class("error")

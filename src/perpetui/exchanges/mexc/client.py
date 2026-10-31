@@ -8,24 +8,24 @@ import hmac
 import json
 import time
 from collections.abc import AsyncIterator
-from dataclasses import replace
 from decimal import Decimal
 from typing import Any
 from urllib.parse import urlencode
 
 import httpx
 
-from perpetui.domain.models import Market, MarketEvent, Positions, PositionsEvent, number
+from perpetui import __version__
+from perpetui.domain.models import Market, MarketEvent, PositionsEvent
 from perpetui.errors import MEXCError
 from perpetui.exchanges.mexc.account import Credentials
 from perpetui.exchanges.mexc.intervals import MEXC_INTERVALS
 from perpetui.exchanges.mexc.market import MEXCMarket, normalize_symbol
-from perpetui.exchanges.mexc.positions import parse_position
+from perpetui.exchanges.mexc.positions import MEXCPositions
 from perpetui.exchanges.mexc.stream import DEFAULT_WS_URL, MarketStream, PositionsStream
 from perpetui.i18n import _
 
 
-class MEXCClient(MEXCMarket):
+class MEXCClient(MEXCMarket, MEXCPositions):
     exchange = "MEXC"
     default_symbol = "BTC_USDT"
     quantity_label = "Contracts"
@@ -54,7 +54,7 @@ class MEXCClient(MEXCMarket):
             base_url=base_url.rstrip("/"),
             timeout=timeout,
             transport=transport,
-            headers={"User-Agent": "perpetui/0.1.0"},
+            headers={"User-Agent": f"perpetui/{__version__}"},
         )
         self._offset = 0
         self._synced = 0.0
@@ -150,53 +150,3 @@ class MEXCClient(MEXCMarket):
             except ValueError:
                 continue
         return sorted(symbols)
-
-    async def positions(self) -> Positions:
-        if not self.authenticated:
-            return Positions([])
-        data = await self._get("/api/v1/private/position/open_positions", signed=True)
-        try:
-            if not isinstance(data, list):
-                raise ValueError("Positions must be an array")
-            positions = [
-                parse_position(row)
-                for row in data
-                if number(row["holdVol"]) > 0 and int(row.get("state", 1)) in (1, 2)
-            ]
-        except (KeyError, ValueError, TypeError) as exc:
-            raise MEXCError("Invalid positions data from MEXC") from exc
-        if not positions:
-            return Positions([])
-        # Fetch all quotes and metadata once, rather than two requests per position.
-        quotes, details = await asyncio.gather(
-            self._get("/api/v1/contract/ticker"),
-            self._contract_details(),
-            return_exceptions=True,
-        )
-        tickers = (
-            {row["symbol"]: row for row in quotes if isinstance(row, dict) and "symbol" in row}
-            if isinstance(quotes, list)
-            else {}
-        )
-        metadata = details if isinstance(details, dict) else {}
-        enriched, missing = [], []
-        for position in positions:
-            try:
-                detail = metadata[position.symbol]
-                enriched.append(
-                    replace(
-                        position,
-                        mark=number(tickers[position.symbol]["fairPrice"]),
-                        contract_size=number(detail["contractSize"]),
-                        settlement=str(detail.get("settleCoin", position.settlement)),
-                    )
-                )
-            except (KeyError, ValueError, TypeError):
-                enriched.append(position)
-                missing.append(position.symbol)
-        warnings = (
-            (_("Mark / PnL unavailable: {symbols}", symbols=", ".join(dict.fromkeys(missing))),)
-            if missing
-            else ()
-        )
-        return Positions(enriched, warnings)
