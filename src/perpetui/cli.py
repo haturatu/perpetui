@@ -100,10 +100,7 @@ def create_client_factory(args: argparse.Namespace) -> Callable[[str], DataSourc
     return create
 
 
-def main(argv: list[str] | None = None) -> int:
-    bootstrap = argparse.ArgumentParser(add_help=False)
-    bootstrap.add_argument("--lang", choices=LANGUAGES)
-    install_language(bootstrap.parse_known_args(argv)[0].lang)
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=_("Hyperliquid / Lighter / MEXC charts and open positions"),
         add_help=False,
@@ -192,6 +189,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--debug", action="store_true", help=_("Enable DEBUG / INFO logs on stdout")
     )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    bootstrap = argparse.ArgumentParser(add_help=False)
+    bootstrap.add_argument("--lang", choices=LANGUAGES)
+    install_language(bootstrap.parse_known_args(argv)[0].lang)
+    parser = build_parser()
     args = parser.parse_args(argv)
     hyperliquid_options = args.wallet_address or args.hl_command or args.hyperliquid_base_url
     lighter_options = args.lighter_account_index is not None or args.lighter_config
