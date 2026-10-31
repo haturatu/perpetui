@@ -5,11 +5,12 @@ from decimal import Decimal
 import pytest
 from textual.widgets import DataTable, Static
 
-from perpetui.app import TradingApp
-from perpetui.chart import CandleChart
-from perpetui.client import MEXCError
-from perpetui.demo import DemoClient
-from perpetui.models import Positions, PositionsEvent, price
+from perpetui.domain.models import Positions, PositionsEvent
+from perpetui.errors import MEXCError
+from perpetui.exchanges.demo import DemoClient
+from perpetui.ui.app import TradingApp
+from perpetui.ui.formatting import price
+from perpetui.ui.widgets.chart import CandleChart
 
 
 class StreamingPositions(DemoClient):

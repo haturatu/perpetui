@@ -7,12 +7,12 @@ import pytest
 from rich.cells import cell_len
 from textual.widgets import DataTable, Input, Static
 
-from perpetui.app import TradingApp
-from perpetui.chart import build_chart
 from perpetui.cli import main
-from perpetui.demo import DemoClient
+from perpetui.exchanges.demo import DemoClient
 from perpetui.i18n import _, current_language, install_language
-from perpetui.search import matching_symbols
+from perpetui.ui.app import TradingApp
+from perpetui.ui.widgets.chart_plot import build_chart
+from perpetui.ui.widgets.search import matching_symbols
 
 
 @pytest.fixture(autouse=True)
@@ -115,7 +115,8 @@ def test_cli_hyperliquid_demo_does_not_read_accounts(monkeypatch):
 
     monkeypatch.setattr("perpetui.cli.TradingApp", FakeApp)
     monkeypatch.setattr(
-        "perpetui.cli.load_hl_account", lambda *args, **kwargs: pytest.fail("Demo read an account")
+        "perpetui.exchanges.factory.load_hl_account",
+        lambda *args, **kwargs: pytest.fail("Demo read an account"),
     )
     assert main(["--exchange", "hl", "--demo", "--symbol", "xyz:cl", "--lang", "ja"]) == 0
     assert captured["client"].exchange == "Hyperliquid" and captured["symbol"] == "xyz:CL"

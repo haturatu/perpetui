@@ -5,14 +5,14 @@ from decimal import Decimal
 import pytest
 from textual.widgets import DataTable, Input, Select, Static
 
-from perpetui.app import TradingApp
-from perpetui.chart import CandleChart
-from perpetui.chart_panel import ChartFrame, ExtraChart
-from perpetui.credentials import CredentialsError
-from perpetui.demo import DemoClient
+from perpetui.domain.models import MarketEvent, Positions, PositionsEvent
+from perpetui.errors import CredentialsError
+from perpetui.exchanges.demo import DemoClient
 from perpetui.i18n import install_language
-from perpetui.models import MarketEvent, Positions, PositionsEvent
-from perpetui.search import SymbolSearch
+from perpetui.ui.app import TradingApp
+from perpetui.ui.widgets.chart import CandleChart
+from perpetui.ui.widgets.chart_panel import ChartFrame, ExtraChart
+from perpetui.ui.widgets.search import SymbolSearch
 
 
 class LiveSource(DemoClient):

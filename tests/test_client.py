@@ -8,8 +8,9 @@ from decimal import Decimal
 import httpx
 import pytest
 
-from perpetui.client import MEXCClient, MEXCError
-from perpetui.credentials import Credentials
+from perpetui.errors import MEXCError
+from perpetui.exchanges.mexc.account import Credentials
+from perpetui.exchanges.mexc.client import MEXCClient
 
 
 def response(data):

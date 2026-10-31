@@ -3,9 +3,9 @@ from decimal import Decimal
 import pytest
 
 from perpetui.cli import main
-from perpetui.demo import DemoClient
+from perpetui.exchanges.demo import DemoClient
+from perpetui.exchanges.mexc.market import normalize_symbol
 from perpetui.logging_config import configure_logging
-from perpetui.models import normalize_symbol
 
 
 @pytest.mark.parametrize(

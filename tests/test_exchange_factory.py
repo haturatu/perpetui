@@ -1,10 +1,10 @@
 import pytest
 
 from perpetui.cli import main
-from perpetui.credentials import Credentials
-from perpetui.hl_account import HLAccount
+from perpetui.exchanges.hyperliquid.account import HLAccount
+from perpetui.exchanges.lighter.account import LighterAccount
+from perpetui.exchanges.mexc.account import Credentials
 from perpetui.i18n import install_language
-from perpetui.lighter_account import LighterAccount
 
 
 @pytest.mark.parametrize("public", [False, True])
@@ -34,8 +34,8 @@ async def test_factory_keeps_account_aliases_and_endpoints_scoped_to_their_excha
         return HLAccount("0x" + "1" * 40)
 
     monkeypatch.setattr("perpetui.cli.TradingApp", FakeApp)
-    monkeypatch.setattr("perpetui.cli.load_credentials", mexc_credentials)
-    monkeypatch.setattr("perpetui.cli.load_hl_account", hl_account)
+    monkeypatch.setattr("perpetui.exchanges.factory.load_credentials", mexc_credentials)
+    monkeypatch.setattr("perpetui.exchanges.factory.load_hl_account", hl_account)
     monkeypatch.setenv("MEXC_WS_URL", "wss://mexc.example/ws")
     monkeypatch.setenv("HYPERLIQUID_WS_URL", "wss://hl.example/ws")
     args = [
@@ -87,8 +87,8 @@ async def test_lighter_factory_reads_only_lighter_accounts_and_its_own_endpoint(
         return LighterAccount(42, "main")
 
     monkeypatch.setattr("perpetui.cli.TradingApp", FakeApp)
-    monkeypatch.setattr("perpetui.cli.load_lighter_account", lighter_account)
-    monkeypatch.setattr("perpetui.cli.load_hl_account", lambda *args, **kwargs: None)
+    monkeypatch.setattr("perpetui.exchanges.factory.load_lighter_account", lighter_account)
+    monkeypatch.setattr("perpetui.exchanges.factory.load_hl_account", lambda *args, **kwargs: None)
     monkeypatch.setenv("LIGHTER_WS_URL", "wss://lighter.example/stream")
     assert main(["--exchange", "lighter", "--account", "main", "--lang", "en"]) == 0
     client = captured["client"]
@@ -146,9 +146,9 @@ def test_demo_factory_never_reads_either_account_store(monkeypatch):
         pytest.fail("Demo accessed credentials")
 
     monkeypatch.setattr("perpetui.cli.TradingApp", FakeApp)
-    monkeypatch.setattr("perpetui.cli.load_credentials", forbidden)
-    monkeypatch.setattr("perpetui.cli.load_hl_account", forbidden)
-    monkeypatch.setattr("perpetui.cli.load_lighter_account", forbidden)
+    monkeypatch.setattr("perpetui.exchanges.factory.load_credentials", forbidden)
+    monkeypatch.setattr("perpetui.exchanges.factory.load_hl_account", forbidden)
+    monkeypatch.setattr("perpetui.exchanges.factory.load_lighter_account", forbidden)
     assert main(["--demo", "--exchange", "hl", "--lang", "en"]) == 0
     assert captured["client_factory"]("mexc").exchange == "MEXC"
     assert captured["client_factory"]("hyperliquid").exchange == "Hyperliquid"

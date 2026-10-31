@@ -1,8 +1,8 @@
 from decimal import Decimal
 
-from perpetui.chart import candle_window
-from perpetui.history import CandleStore
-from perpetui.models import Candle
+from perpetui.domain.history import CandleStore
+from perpetui.domain.models import Candle
+from perpetui.ui.widgets.chart_plot import candle_window
 
 
 def bar(timestamp, closing="100"):

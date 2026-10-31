@@ -1,0 +1,38 @@
+Screen { background: #080e18; color: #e4edf8; }
+#topbar { height: 3; padding: 0 1; align-vertical: middle;
+    border-bottom: solid #233149; }
+#brand { width: 1fr; color: #e4edf8; text-style: bold; }
+#connection { width: auto; color: #788ba9; }
+#exchange { width: 18; height: 1; margin: 0 1; }
+#chart-count { width: 7; height: 1; margin: 0 1; }
+#chart-layout { width: 16; height: 1; margin: 0 1; }
+#exchange > SelectCurrent, #chart-count > SelectCurrent, #chart-layout > SelectCurrent {
+    height: 1; border: none; padding: 0 1; }
+#market-summary { height: 3; padding: 0 2; content-align: left middle; }
+#toolbar { height: 3; padding: 0 1; }
+Input { width: 24; height: 3; border: tall #233149; background: #101a2a; }
+Input:focus { border: tall #7aa2ff; }
+Select { width: 13; margin-left: 1; }
+SelectCurrent { border: tall #233149; background: #101a2a; }
+#candle-info { width: 1fr; padding: 1 1; color: #788ba9; }
+#chart-grid { height: 1fr; min-height: 8; margin: 0 1;
+    grid-size: 1 1; grid-columns: 1fr; grid-rows: 1fr; grid-gutter: 0 1; }
+.chart-frame { height: 1fr; min-height: 0;
+    border: round #233149; padding: 0 1; border-title-color: #aebfd8; }
+.chart-frame.active { border: round #7aa2ff; }
+CandleChart { height: 1fr; }
+#positions-pane { height: auto; min-height: 0; margin: 0 1; border: round #233149;
+    border-title-color: #aebfd8; }
+#positions-summary { height: 1; padding: 0 1; color: #788ba9; }
+DataTable { height: 1fr; background: #080e18; }
+DataTable > .datatable--header { background: #101a2a; color: #788ba9; text-style: none; }
+DataTable > .datatable--cursor { background: #192d49; color: #e4edf8; }
+DataTable > .datatable--hover { background: #112036; }
+#empty { height: 1fr; content-align: center middle; color: #788ba9; }
+#status { height: 1; padding: 0 2; color: #788ba9; }
+#status.error { color: #fb7185; }
+Footer { background: #101a2a; }
+Footer > .footer--key { background: #192d49; color: #b6cdff; }
+Screen.compact #topbar { height: 1; border: none; }
+Screen.compact #market-summary { height: 2; }
+Screen.compact #candle-info { display: none; }

@@ -2,8 +2,8 @@ import sqlite3
 
 import pytest
 
-from perpetui.credentials import CredentialsError
-from perpetui.lighter_account import load_lighter_account, validate_account_index
+from perpetui.errors import CredentialsError
+from perpetui.exchanges.lighter.account import load_lighter_account, validate_account_index
 
 
 @pytest.fixture(autouse=True)

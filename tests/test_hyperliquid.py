@@ -8,8 +8,9 @@ import pytest
 from websockets.asyncio.server import serve
 
 from perpetui.errors import ExchangeError
-from perpetui.hl_account import HLAccount
-from perpetui.hyperliquid import HyperliquidClient, apply_market, normalize_hl_symbol
+from perpetui.exchanges.hyperliquid.account import HLAccount
+from perpetui.exchanges.hyperliquid.client import HyperliquidClient
+from perpetui.exchanges.hyperliquid.parser import apply_market, normalize_hl_symbol
 
 ADDRESS = "0x" + "1" * 40
 METAS = [

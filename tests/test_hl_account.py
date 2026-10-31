@@ -5,8 +5,8 @@ import sqlite3
 import pytest
 from Crypto.Cipher import ChaCha20
 
-from perpetui.credentials import CredentialsError
-from perpetui.hl_account import load_hl_account, validate_address
+from perpetui.errors import CredentialsError
+from perpetui.exchanges.hyperliquid.account import load_hl_account, validate_address
 
 ADDRESS = "0x" + "a" * 40
 

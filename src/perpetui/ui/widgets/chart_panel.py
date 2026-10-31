@@ -14,11 +14,11 @@ from textual.binding import Binding
 from textual.containers import Vertical
 from textual.message import Message
 
-from .chart import CandleChart
-from .client import DataSource
-from .errors import ExchangeError
-from .i18n import _
-from .models import Market
+from perpetui.domain.models import Market
+from perpetui.errors import ExchangeError
+from perpetui.exchanges.base import DataSource
+from perpetui.i18n import _
+from perpetui.ui.widgets.chart import CandleChart
 
 logger = logging.getLogger("perpetui")
 

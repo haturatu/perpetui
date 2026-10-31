@@ -10,7 +10,8 @@ from contextlib import closing
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .credentials import CredentialsError, _decrypt
+from perpetui.errors import CredentialsError
+from perpetui.exchanges.account_crypto import _decrypt
 
 
 @dataclass(frozen=True)

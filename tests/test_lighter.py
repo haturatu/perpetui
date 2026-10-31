@@ -8,8 +8,9 @@ import pytest
 from websockets.asyncio.server import serve
 
 from perpetui.errors import ExchangeError
-from perpetui.lighter import LighterClient, apply_market, normalize_lighter_symbol
-from perpetui.lighter_account import LighterAccount
+from perpetui.exchanges.lighter.account import LighterAccount
+from perpetui.exchanges.lighter.client import LighterClient
+from perpetui.exchanges.lighter.parser import apply_market, normalize_lighter_symbol
 
 DETAILS = [
     {

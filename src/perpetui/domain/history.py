@@ -5,7 +5,7 @@ from __future__ import annotations
 from bisect import bisect_right
 from dataclasses import dataclass
 
-from .models import Candle
+from perpetui.domain.models import Candle
 
 MAX_HISTORY = 5000
 

@@ -10,58 +10,27 @@ import time
 from collections.abc import AsyncIterator
 from dataclasses import replace
 from decimal import Decimal
-from typing import Any, Protocol
+from typing import Any
 from urllib.parse import urlencode
 
 import httpx
 
-from .credentials import Credentials
-from .errors import MEXCError
-from .i18n import _
-from .models import (
-    INTERVALS,
-    Candle,
-    Market,
-    MarketEvent,
-    Positions,
-    PositionsEvent,
-    normalize_symbol,
-    number,
-)
-from .position_stream import PositionsStream, parse_position
-from .stream import DEFAULT_WS_URL, MarketStream
+from perpetui.domain.models import Market, MarketEvent, Positions, PositionsEvent, number
+from perpetui.errors import MEXCError
+from perpetui.exchanges.mexc.account import Credentials
+from perpetui.exchanges.mexc.intervals import MEXC_INTERVALS
+from perpetui.exchanges.mexc.market import MEXCMarket, normalize_symbol
+from perpetui.exchanges.mexc.positions import parse_position
+from perpetui.exchanges.mexc.stream import DEFAULT_WS_URL, MarketStream, PositionsStream
+from perpetui.i18n import _
 
 
-class DataSource(Protocol):
-    exchange: str
-    default_symbol: str
-    quantity_label: str
-    public_hint: str
-    authenticated: bool
-    label: str
-    streaming: bool
-    position_streaming: bool
-    intervals: tuple[str, ...]
-
-    def normalize_symbol(self, value: str) -> str: ...
-
-    async def positions(self) -> Positions: ...
-    async def symbols(self) -> list[str]: ...
-    async def market(self, symbol: str, interval: str) -> Market: ...
-    async def history(
-        self, symbol: str, interval: str, before: int, limit: int = 500
-    ) -> list[Candle]: ...
-    def stream_market(self, seed: Market) -> AsyncIterator[MarketEvent]: ...
-    def stream_positions(self) -> AsyncIterator[PositionsEvent]: ...
-    async def close(self) -> None: ...
-
-
-class MEXCClient:
+class MEXCClient(MEXCMarket):
     exchange = "MEXC"
     default_symbol = "BTC_USDT"
     quantity_label = "Contracts"
     public_hint = "Public market mode · configure mexc-cli or MEXC_API_KEY / MEXC_API_SECRET"
-    intervals = tuple(INTERVALS)
+    intervals = tuple(MEXC_INTERVALS)
     normalize_symbol = staticmethod(normalize_symbol)
 
     def __init__(
@@ -156,82 +125,6 @@ class MEXCClient:
         if "data" not in payload:
             raise MEXCError("MEXC response is missing data")
         return payload["data"]
-
-    async def market(self, symbol: str, interval: str) -> Market:
-        exchange_interval, seconds = INTERVALS[interval]
-        end = int(time.time())
-        try:
-            bars, ticker = await asyncio.gather(
-                self._get(
-                    f"/api/v1/contract/kline/{symbol}",
-                    {
-                        "interval": exchange_interval,
-                        "start": end - seconds * 160,
-                        "end": end,
-                    },
-                ),
-                self._get("/api/v1/contract/ticker", {"symbol": symbol}),
-            )
-            if isinstance(ticker, list):
-                ticker = next(row for row in ticker if row["symbol"] == symbol)
-            if not isinstance(ticker, dict) or ticker.get("symbol") != symbol:
-                raise ValueError("Mismatched ticker")
-            columns = [bars[key] for key in ("time", "open", "high", "low", "close", "vol")]
-            if not columns[0] or len({len(column) for column in columns}) != 1:
-                raise ValueError("Empty or mismatched candle arrays")
-            candles = []
-            for timestamp, opening, high, low, closing, volume in zip(*columns, strict=True):
-                candle = Candle(int(timestamp), *map(number, (opening, high, low, closing, volume)))
-                if (
-                    candle.low <= 0
-                    or candle.volume < 0
-                    or candle.high < max(candle.open, candle.close)
-                    or candle.low > min(candle.open, candle.close)
-                ):
-                    raise ValueError("Invalid OHLC data")
-                candles.append(candle)
-            candles.sort(key=lambda bar: bar.time)
-            return Market(
-                symbol,
-                interval,
-                candles,
-                number(ticker["lastPrice"]),
-                number(ticker["fairPrice"]),
-                number(ticker["riseFallRate"]) * 100,
-                number(ticker["high24Price"]),
-                number(ticker["lower24Price"]),
-                number(ticker["amount24"]),
-            )
-        except (KeyError, ValueError, TypeError, StopIteration) as exc:
-            raise MEXCError(f"Invalid or empty market data for {symbol}") from exc
-
-    async def history(
-        self, symbol: str, interval: str, before: int, limit: int = 500
-    ) -> list[Candle]:
-        """Fetch candles strictly older than ``before`` (Unix seconds)."""
-        exchange_interval, seconds = INTERVALS[interval]
-        limit = max(1, min(2000, limit))
-        end = before - 1
-        try:
-            bars = await self._get(
-                f"/api/v1/contract/kline/{symbol}",
-                {
-                    "interval": exchange_interval,
-                    "start": end - seconds * limit,
-                    "end": end,
-                },
-            )
-            columns = [bars[key] for key in ("time", "open", "high", "low", "close", "vol")]
-            if not columns[0] or len({len(column) for column in columns}) != 1:
-                return []
-            candles = [
-                Candle(int(timestamp), *map(number, (opening, high, low, closing, volume)))
-                for timestamp, opening, high, low, closing, volume in zip(*columns, strict=True)
-            ]
-        except (KeyError, ValueError, TypeError) as exc:
-            raise MEXCError(f"Invalid candle history for {symbol}") from exc
-        candles.sort(key=lambda bar: bar.time)
-        return [bar for bar in candles if bar.time < before][-limit:]
 
     async def _contract_details(self) -> dict[str, dict[str, Any]]:
         async with self._details_lock:

@@ -5,7 +5,8 @@ import sqlite3
 import pytest
 from Crypto.Cipher import ChaCha20
 
-from perpetui.credentials import CredentialsError, load_credentials
+from perpetui.errors import CredentialsError
+from perpetui.exchanges.mexc.account import load_credentials
 
 
 @pytest.fixture(autouse=True)

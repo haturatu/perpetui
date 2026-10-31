@@ -1,36 +1,8 @@
-"""Validated exchange data; monetary calculations stay in Decimal."""
-
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Literal
-
-INTERVALS: dict[str, tuple[str, int]] = {
-    "1m": ("Min1", 60),
-    "5m": ("Min5", 300),
-    "15m": ("Min15", 900),
-    "30m": ("Min30", 1800),
-    "1h": ("Min60", 3600),
-    "4h": ("Hour4", 14400),
-    "1d": ("Day1", 86400),
-    "1w": ("Week1", 604800),
-}
-
-
-def normalize_symbol(value: str) -> str:
-    symbol = value.strip().upper().replace("/", "_").replace("-", "_")
-    if "_" not in symbol:
-        for quote in ("USDT", "USDC", "USD"):
-            if symbol.endswith(quote) and len(symbol) > len(quote):
-                symbol = f"{symbol[: -len(quote)]}_{quote}"
-                break
-        else:
-            symbol = f"{symbol}_USDT"
-    if not re.fullmatch(r"[A-Z0-9]+_(USDT|USDC|USD)", symbol):
-        raise ValueError("Use a symbol such as BTC, ETHUSDT or BTC_USDT")
-    return symbol
 
 
 def number(value: object) -> Decimal:
@@ -41,23 +13,6 @@ def number(value: object) -> Decimal:
     if not result.is_finite():
         raise ValueError("Non-finite numeric data from MEXC")
     return result
-
-
-def price(value: Decimal | None) -> str:
-    if value is None:
-        return "—"
-    magnitude = abs(value)
-    places = (
-        2 if magnitude >= 100 else 4 if magnitude >= 1 else 6 if magnitude >= Decimal(".01") else 8
-    )
-    return f"{value:,.{places}f}"
-
-
-def compact(value: Decimal) -> str:
-    for suffix, divisor in (("B", 10**9), ("M", 10**6), ("K", 10**3)):
-        if abs(value) >= divisor:
-            return f"{value / divisor:.2f}{suffix}"
-    return f"{value:,.2f}"
 
 
 @dataclass(frozen=True)

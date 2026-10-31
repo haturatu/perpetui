@@ -25,7 +25,7 @@ def test_cli_installs_keymap_without_loading_accounts(tmp_path, monkeypatch, cap
     def forbidden(*args, **kwargs):
         pytest.fail("Installer loaded an account")
 
-    monkeypatch.setattr("perpetui.cli.load_credentials", forbidden)
-    monkeypatch.setattr("perpetui.cli.load_hl_account", forbidden)
+    monkeypatch.setattr("perpetui.exchanges.factory.load_credentials", forbidden)
+    monkeypatch.setattr("perpetui.exchanges.factory.load_hl_account", forbidden)
     assert main(["--install-konsole-keymap", "--lang", "en"]) == 0
     assert "Keyboard settings" in capsys.readouterr().out

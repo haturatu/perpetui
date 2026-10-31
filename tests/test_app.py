@@ -5,11 +5,11 @@ from decimal import Decimal
 import pytest
 from textual.widgets import DataTable, Input, Static
 
-from perpetui.app import TradingApp
-from perpetui.chart import CandleChart
-from perpetui.client import MEXCError
-from perpetui.demo import DemoClient
-from perpetui.models import MarketEvent
+from perpetui.domain.models import MarketEvent
+from perpetui.errors import MEXCError
+from perpetui.exchanges.demo import DemoClient
+from perpetui.ui.app import TradingApp
+from perpetui.ui.widgets.chart import CandleChart
 
 
 async def settle(app, pilot):
@@ -252,7 +252,7 @@ async def test_public_mode_loads_initial_history_once():
         authenticated = False
 
         async def positions(self):
-            from perpetui.models import Positions
+            from perpetui.domain.models import Positions
 
             return Positions([])
 

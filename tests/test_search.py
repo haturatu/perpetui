@@ -3,10 +3,10 @@ import asyncio
 import pytest
 from textual.widgets import DataTable, Input
 
-from perpetui.app import TradingApp
-from perpetui.client import MEXCError
-from perpetui.demo import DemoClient
-from perpetui.search import Suggestions, matching_symbols
+from perpetui.errors import MEXCError
+from perpetui.exchanges.demo import DemoClient
+from perpetui.ui.app import TradingApp
+from perpetui.ui.widgets.search import Suggestions, matching_symbols
 
 
 @pytest.mark.parametrize(

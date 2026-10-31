@@ -9,7 +9,7 @@ from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 
-from .credentials import CredentialsError
+from perpetui.errors import CredentialsError
 
 DEFAULT_CONFIG = Path("~/.config/ligher-xyz-cli/accounts.db")
 

@@ -8,10 +8,11 @@ from decimal import Decimal
 import pytest
 from websockets.asyncio.server import serve
 
-from perpetui.demo import DemoClient
-from perpetui.history import MAX_HISTORY
-from perpetui.models import INTERVALS
-from perpetui.stream import HistoryGap, MarketStream, apply_message, decode_message
+from perpetui.domain.history import MAX_HISTORY
+from perpetui.exchanges.demo import DemoClient
+from perpetui.exchanges.mexc.intervals import MEXC_INTERVALS as INTERVALS
+from perpetui.exchanges.mexc.stream import MarketStream, apply_message
+from perpetui.exchanges.websocket import HistoryGap, decode_message
 
 
 def candle_message(seed, *, timestamp=None, close=None, volume=42, **kwargs):
@@ -338,8 +339,8 @@ async def test_lagging_ticker_does_not_rewind_fresh_candle_close():
 async def test_same_bucket_updates_reach_chart_with_high_low_and_volume():
     from textual.widgets import Static
 
-    from perpetui.app import TradingApp
-    from perpetui.chart import CandleChart
+    from perpetui.ui.app import TradingApp
+    from perpetui.ui.widgets.chart import CandleChart
 
     class StreamingSource(DemoClient):
         streaming = True
@@ -349,7 +350,7 @@ async def test_same_bucket_updates_reach_chart_with_high_low_and_volume():
             self.queue = asyncio.Queue()
 
         async def stream_market(self, seed):
-            from perpetui.models import MarketEvent
+            from perpetui.domain.models import MarketEvent
 
             yield MarketEvent("live", seed)
             while True:

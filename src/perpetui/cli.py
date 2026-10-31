@@ -1,23 +1,18 @@
 from __future__ import annotations
 
 import argparse
-import os
-from collections.abc import Callable
+
+from perpetui.domain.intervals import INTERVAL_SECONDS
+from perpetui.errors import CredentialsError
+from perpetui.exchanges.factory import create_client_factory
+from perpetui.exchanges.lighter.account import validate_account_index
+from perpetui.exchanges.lighter.client import LighterClient
+from perpetui.i18n import LANGUAGES, _, install_language
+from perpetui.konsole import install_keymap
+from perpetui.logging_config import configure_logging
+from perpetui.ui.app import TradingApp
 
 from . import __version__
-from .app import TradingApp
-from .client import DataSource, MEXCClient
-from .credentials import CredentialsError, load_credentials
-from .demo import DemoClient
-from .hl_account import load_hl_account
-from .hyperliquid import HyperliquidClient
-from .i18n import LANGUAGES, _, install_language
-from .konsole import install_keymap
-from .lighter import LighterClient
-from .lighter_account import load_lighter_account, validate_account_index
-from .logging_config import configure_logging
-from .models import INTERVALS
-from .stream import DEFAULT_WS_URL
 
 
 class LocalizedHelpFormatter(argparse.HelpFormatter):
@@ -35,69 +30,6 @@ def positive_float(value: str) -> float:
     if not math.isfinite(result) or result < 1:
         raise argparse.ArgumentTypeError(_("Must be a finite number of at least 1 second"))
     return result
-
-
-def create_client_factory(args: argparse.Namespace) -> Callable[[str], DataSource]:
-    initial_exchange = {"hl": "hyperliquid", "lt": "lighter"}.get(args.exchange, args.exchange)
-
-    def create(exchange: str) -> DataSource:
-        alias = args.account if exchange == initial_exchange else None
-        websocket_url = args.websocket_url if exchange == initial_exchange else None
-        if args.demo or args.demo_empty:
-            return DemoClient(empty=args.demo_empty, exchange=exchange)
-        if exchange == "hyperliquid":
-            account = (
-                None
-                if args.public
-                else load_hl_account(
-                    alias,
-                    args.hl_command,
-                    address=args.wallet_address,
-                    testnet=args.testnet,
-                )
-            )
-            return HyperliquidClient(
-                account,
-                testnet=args.testnet,
-                timeout=args.timeout,
-                base_url=args.hyperliquid_base_url or os.getenv("HYPERLIQUID_BASE_URL"),
-                websocket_url=websocket_url or os.getenv("HYPERLIQUID_WS_URL"),
-                streaming=not args.no_websocket,
-            )
-        if exchange == "lighter":
-            account = (
-                None
-                if args.public
-                else load_lighter_account(
-                    alias,
-                    account_index=args.lighter_account_index,
-                    testnet=args.testnet,
-                    config=args.lighter_config,
-                )
-            )
-            return LighterClient(
-                account,
-                testnet=args.testnet,
-                timeout=args.timeout,
-                base_url=args.lighter_base_url or os.getenv("LIGHTER_BASE_URL"),
-                websocket_url=websocket_url or os.getenv("LIGHTER_WS_URL"),
-                streaming=not args.no_websocket,
-            )
-        if exchange != "mexc":
-            raise ValueError("Unknown exchange")
-        credentials = None if args.public else load_credentials(alias, args.mexc_command)
-        return MEXCClient(
-            credentials,
-            args.futures_base_url
-            or os.getenv("MEXC_FUTURES_BASE_URL")
-            or os.getenv("MEXC_BASE_URL")
-            or "https://api.mexc.com",
-            args.timeout,
-            websocket_url=websocket_url or os.getenv("MEXC_WS_URL") or DEFAULT_WS_URL,
-            streaming=not args.no_websocket,
-        )
-
-    return create
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -136,7 +68,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--symbol", help=_("Initial symbol, e.g. BTC, ETH_USDT or xyz:CL"))
     parser.add_argument(
-        "--interval", choices=INTERVALS, default="15m", help=_("Initial candle interval")
+        "--interval", choices=INTERVAL_SECONDS, default="15m", help=_("Initial candle interval")
     )
     parser.add_argument(
         "--refresh",
@@ -213,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.exchange in {"lighter", "lt"} and mexc_options:
         parser.error(_("MEXC options require --exchange mexc"))
     exchange = {"hl": "hyperliquid", "lt": "lighter"}.get(args.exchange, args.exchange)
-    supported = LighterClient.intervals if exchange == "lighter" else tuple(INTERVALS)
+    supported = LighterClient.intervals if exchange == "lighter" else tuple(INTERVAL_SECONDS)
     if args.interval not in supported:
         parser.error(
             _(

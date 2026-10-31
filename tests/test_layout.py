@@ -1,6 +1,6 @@
 import pytest
 
-from perpetui.layout import LAYOUT_MODES, choose_layout
+from perpetui.ui.layout import LAYOUT_MODES, choose_layout
 
 
 @pytest.mark.parametrize(

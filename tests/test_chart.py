@@ -7,10 +7,12 @@ from rich.cells import cell_len
 from rich.console import Console
 from textual.app import App, ComposeResult
 
-from perpetui.app import TradingApp
-from perpetui.chart import CandleChart, build_chart
-from perpetui.demo import DemoClient
-from perpetui.models import Candle, price
+from perpetui.domain.models import Candle
+from perpetui.exchanges.demo import DemoClient
+from perpetui.ui.app import TradingApp
+from perpetui.ui.formatting import price
+from perpetui.ui.widgets.chart import CandleChart
+from perpetui.ui.widgets.chart_plot import build_chart
 
 
 @pytest.mark.parametrize("size", [(30, 6), (35, 6), (74, 7), (114, 17), (154, 30)])

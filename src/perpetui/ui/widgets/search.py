@@ -11,7 +11,7 @@ from textual.message import Message
 from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
-from .i18n import _
+from perpetui.i18n import _
 
 
 def matching_symbols(query: str, symbols: list[str], limit: int = 8) -> list[str]:

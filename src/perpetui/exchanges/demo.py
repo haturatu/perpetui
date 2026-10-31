@@ -9,19 +9,13 @@ from collections.abc import AsyncIterator
 from dataclasses import replace
 from decimal import Decimal
 
-from .hyperliquid import normalize_hl_symbol
-from .i18n import _
-from .lighter import LIGHTER_INTERVALS, normalize_lighter_symbol
-from .models import (
-    INTERVALS,
-    Candle,
-    Market,
-    MarketEvent,
-    Position,
-    Positions,
-    PositionsEvent,
-    normalize_symbol,
-)
+from perpetui.domain.intervals import INTERVAL_SECONDS
+from perpetui.domain.models import Candle, Market, MarketEvent, Position, Positions, PositionsEvent
+from perpetui.exchanges.hyperliquid.parser import normalize_hl_symbol
+from perpetui.exchanges.lighter.client import LIGHTER_INTERVALS
+from perpetui.exchanges.lighter.parser import normalize_lighter_symbol
+from perpetui.exchanges.mexc.market import normalize_symbol
+from perpetui.i18n import _
 
 
 class DemoClient:
@@ -33,7 +27,7 @@ class DemoClient:
     label = "DEMO · sample data"
     streaming = False
     position_streaming = False
-    intervals = tuple(INTERVALS)
+    intervals = tuple(INTERVAL_SECONDS)
 
     async def stream_market(self, seed: Market) -> AsyncIterator[MarketEvent]:
         yield MarketEvent("live", seed)
@@ -146,7 +140,7 @@ class DemoClient:
         target = {"BTC": 97428.60, "ETH": 3518.42, "SOL": 176.82}.get(symbol.split("_")[0], 42.5)
         # Deterministic sample data only; never used for security decisions.
         rng = random.Random(symbol + interval)  # nosec B311
-        seconds = INTERVALS[interval][1]
+        seconds = INTERVAL_SECONDS[interval]
         now = int(time.time()) // seconds * seconds
         values = []
         previous = target * 0.982
@@ -182,7 +176,7 @@ class DemoClient:
         self, symbol: str, interval: str, before: int, limit: int = 500
     ) -> list[Candle]:
         market = await self.market(symbol, interval)
-        seconds = INTERVALS[interval][1]
+        seconds = INTERVAL_SECONDS[interval]
         # Deterministic sample history only; never used for security decisions.
         rng = random.Random(symbol + interval + "history")  # nosec B311
         anchor = float(market.candles[0].open)

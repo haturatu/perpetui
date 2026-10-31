@@ -8,7 +8,7 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
-from .i18n import _
+from perpetui.i18n import _
 
 
 class HelpScreen(ModalScreen[None]):

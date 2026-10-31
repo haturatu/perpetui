@@ -9,10 +9,11 @@ from decimal import Decimal
 import pytest
 from websockets.asyncio.server import serve
 
-from perpetui.credentials import Credentials
-from perpetui.demo import DemoClient
-from perpetui.models import Positions
-from perpetui.position_stream import PositionBook, PositionsStream, parse_position
+from perpetui.domain.models import Positions
+from perpetui.exchanges.demo import DemoClient
+from perpetui.exchanges.mexc.account import Credentials
+from perpetui.exchanges.mexc.positions import PositionBook, parse_position
+from perpetui.exchanges.mexc.stream import PositionsStream
 
 CREDENTIALS = Credentials("test-key", "test-secret")
 DETAILS = {
