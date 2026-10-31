@@ -9,7 +9,7 @@ from perpetui import __version__
 from perpetui.cli import build_parser
 from perpetui.i18n import install_language
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_cobra_and_argparse_agree_on_options_defaults_choices_and_english_help():
