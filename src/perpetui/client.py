@@ -48,6 +48,9 @@ class DataSource(Protocol):
     async def positions(self) -> Positions: ...
     async def symbols(self) -> list[str]: ...
     async def market(self, symbol: str, interval: str) -> Market: ...
+    async def history(
+        self, symbol: str, interval: str, before: int, limit: int = 500
+    ) -> list[Candle]: ...
     def stream_market(self, seed: Market) -> AsyncIterator[MarketEvent]: ...
     def stream_positions(self) -> AsyncIterator[PositionsEvent]: ...
     async def close(self) -> None: ...
@@ -201,6 +204,34 @@ class MEXCClient:
             )
         except (KeyError, ValueError, TypeError, StopIteration) as exc:
             raise MEXCError(f"Invalid or empty market data for {symbol}") from exc
+
+    async def history(
+        self, symbol: str, interval: str, before: int, limit: int = 500
+    ) -> list[Candle]:
+        """Fetch candles strictly older than ``before`` (Unix seconds)."""
+        exchange_interval, seconds = INTERVALS[interval]
+        limit = max(1, min(2000, limit))
+        end = before - 1
+        try:
+            bars = await self._get(
+                f"/api/v1/contract/kline/{symbol}",
+                {
+                    "interval": exchange_interval,
+                    "start": end - seconds * limit,
+                    "end": end,
+                },
+            )
+            columns = [bars[key] for key in ("time", "open", "high", "low", "close", "vol")]
+            if not columns[0] or len({len(column) for column in columns}) != 1:
+                return []
+            candles = [
+                Candle(int(timestamp), *map(number, (opening, high, low, closing, volume)))
+                for timestamp, opening, high, low, closing, volume in zip(*columns, strict=True)
+            ]
+        except (KeyError, ValueError, TypeError) as exc:
+            raise MEXCError(f"Invalid candle history for {symbol}") from exc
+        candles.sort(key=lambda bar: bar.time)
+        return [bar for bar in candles if bar.time < before][-limit:]
 
     async def _contract_details(self) -> dict[str, dict[str, Any]]:
         async with self._details_lock:

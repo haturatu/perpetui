@@ -9,6 +9,7 @@ import pytest
 from websockets.asyncio.server import serve
 
 from perpetui.demo import DemoClient
+from perpetui.history import MAX_HISTORY
 from perpetui.models import INTERVALS
 from perpetui.stream import HistoryGap, MarketStream, apply_message, decode_message
 
@@ -33,7 +34,7 @@ def candle_message(seed, *, timestamp=None, close=None, volume=42, **kwargs):
     }
 
 
-async def test_cumulative_candles_replace_append_trim_and_ignore_old_buckets():
+async def test_cumulative_candles_replace_append_extend_and_ignore_old_buckets():
     seed = await DemoClient().market("BTC_USDT", "15m")
     first = apply_message(seed, candle_message(seed, volume=42))
     second = apply_message(first, candle_message(seed, close=seed.last + 2, volume=70))
@@ -43,9 +44,10 @@ async def test_cumulative_candles_replace_append_trim_and_ignore_old_buckets():
     next_bar = apply_message(
         second, candle_message(seed, timestamp=seed.candles[-1].time + 900, volume=3)
     )
-    assert len(next_bar.candles) == 160
+    assert len(next_bar.candles) == len(second.candles) + 1
     assert next_bar.candles[-2] == second.candles[-1]
     assert next_bar.candles[-1].volume == 3
+    assert len(next_bar.candles) <= MAX_HISTORY
     assert apply_message(next_bar, candle_message(seed)) is next_bar
     assert apply_message(seed, candle_message(seed, symbol="ETH_USDT")) is seed
     assert apply_message(seed, candle_message(seed, interval="Min1")) is seed

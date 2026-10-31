@@ -368,6 +368,92 @@ async def test_delayed_initial_positions_do_not_replace_a_manually_chosen_extra_
         assert panel.symbol == panel.market.symbol == "ZEC_USDT"
 
 
+async def test_number_keys_select_charts_without_stealing_search_typing():
+    app = TradingApp(DemoClient(), refresh_seconds=3600)
+    async with app.run_test(size=(160, 50)) as pilot:
+        await settle(app, pilot)
+        await pilot.press("ctrl+3")
+        await settle(app, pilot)
+        await pilot.press("2")
+        await pilot.pause()
+        assert app._active_extra is app.query_one("#chart-pane-2", ExtraChart)
+        assert app.focused is app.query_one("#chart-pane-2")
+        await pilot.press("/", "1", "2")
+        assert app.query_one(Input).value == "12"
+        assert app._active_extra is app.query_one("#chart-pane-2", ExtraChart)
+
+
+async def test_cursor_navigation_enters_history_backfills_and_returns_live():
+    app = TradingApp(DemoClient(), refresh_seconds=3600)
+    async with app.run_test(size=(120, 40)) as pilot:
+        await settle(app, pilot)
+        chart = app.query_one(CandleChart)
+        initial_earliest = chart.earliest_time()
+        await pilot.press("1", "left")
+        await pilot.pause()
+        assert chart.cursor_time is not None
+        assert chart.mode_label().startswith("HISTORY")
+        assert "HISTORY" in app.query_one("#chart-pane").border_title
+        assert "HISTORY" in str(app.query_one("#candle-info", Static).render())
+        original_earliest = chart.earliest_time()
+        await pilot.press("home")
+        await settle(app, pilot)
+        assert chart.cursor_time == original_earliest
+        assert chart.earliest_time() < initial_earliest
+        await pilot.press("end")
+        await pilot.pause()
+        assert chart.cursor_time is None
+        assert "LIVE" in app.query_one("#chart-pane").border_title
+
+
+async def test_all_chart_sync_cursor_sync_maximize_positions_and_help():
+    app = TradingApp(DemoClient(), refresh_seconds=3600)
+    async with app.run_test(size=(160, 50)) as pilot:
+        await settle(app, pilot)
+        await pilot.press("ctrl+3", "1")
+        await settle(app, pilot)
+        assert app.interval == "15m"
+        await pilot.press("]", "a")
+        await settle(app, pilot)
+        assert app._all_timeframes and app.interval == "30m"
+        assert [panel.interval for panel in app.query(ExtraChart)] == ["30m", "30m"]
+        await pilot.press("]")
+        await pilot.pause(0.25)
+        await settle(app, pilot)
+        assert app.interval == "1h"
+        assert [panel.interval for panel in app.query(ExtraChart)] == ["1h", "1h"]
+
+        await pilot.press("2", "left", "s")
+        await pilot.pause()
+        assert app._cursor_sync
+        charts = [panel.query_one(CandleChart) for panel in app.query(ExtraChart)]
+        assert all(chart.cursor_time is not None for chart in charts)
+        assert charts[0].cursor_time == charts[1].cursor_time
+
+        active = app._active_extra
+        await pilot.press("z")
+        await pilot.pause()
+        assert app._maximized
+        assert active.display and not app.query_one("#chart-pane").display
+        await pilot.press("z")
+        await pilot.pause()
+        assert not app._maximized and app.query_one("#chart-pane").display
+
+        await pilot.press("p")
+        await pilot.pause()
+        assert not app.query_one("#positions-pane").display
+        await pilot.press("p")
+        await pilot.pause()
+        assert app.query_one("#positions-pane").display
+
+        await pilot.press("question_mark")
+        await pilot.pause()
+        assert type(app.screen).__name__ == "HelpScreen"
+        await pilot.press("escape")
+        await pilot.pause()
+        assert type(app.screen).__name__ != "HelpScreen"
+
+
 async def test_enter_applies_the_already_highlighted_position_to_the_selected_pane():
     app = TradingApp(DemoClient(), refresh_seconds=3600)
     async with app.run_test(size=(120, 40)) as pilot:

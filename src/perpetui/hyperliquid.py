@@ -18,6 +18,7 @@ from websockets.asyncio.client import connect
 from websockets.exceptions import WebSocketException
 
 from .errors import ExchangeError
+from .history import MAX_HISTORY
 from .hl_account import HLAccount
 from .i18n import _
 from .models import (
@@ -137,7 +138,7 @@ def apply_market(market: Market, message: dict[str, Any]) -> Market:
         else:
             bars.append(candle)
     return (
-        replace(market, candles=bars[-160:], last=bars[-1].close)
+        replace(market, candles=bars[-MAX_HISTORY:], last=bars[-1].close)
         if bars != market.candles
         else market
     )
@@ -302,6 +303,38 @@ class HyperliquidClient:
             )
         except (KeyError, TypeError, ValueError, IndexError) as exc:
             raise ExchangeError("Invalid or empty Hyperliquid market data") from exc
+
+    async def history(
+        self, symbol: str, interval: str, before: int, limit: int = 500
+    ) -> list[Candle]:
+        """Fetch candles strictly older than ``before`` (Unix seconds)."""
+        await self._load_metadata()
+        symbol = self.normalize_symbol(symbol)
+        if symbol not in self._metadata:
+            raise ExchangeError("Unknown Hyperliquid perpetual symbol")
+        limit = max(1, min(5000, limit))
+        seconds = INTERVALS[interval][1]
+        bars = await self._info(
+            "candleSnapshot",
+            req={
+                "coin": symbol,
+                "interval": interval,
+                "startTime": (before - seconds * limit) * 1000,
+                "endTime": (before - 1) * 1000,
+            },
+        )
+        try:
+            parsed = {
+                bar.time: bar
+                for bar in (
+                    parse_candle(row, symbol, interval)
+                    for row in bars
+                    if int(row.get("t", 0)) // 1000 < before
+                )
+            }
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ExchangeError(f"Invalid candle history for {symbol}") from exc
+        return sorted(parsed.values(), key=lambda bar: bar.time)[-limit:]
 
     async def _heartbeat(self, websocket) -> None:
         while True:

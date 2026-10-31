@@ -22,6 +22,8 @@ from .chart_panel import ChartFrame, ExtraChart
 from .client import DataSource
 from .credentials import CredentialsError
 from .errors import ExchangeError
+from .help import HelpScreen
+from .history import CandleStore
 from .i18n import _
 from .models import INTERVALS, Market, Position, Positions, compact, price
 from .search import SymbolSearch
@@ -96,10 +98,34 @@ class TradingApp(App[None]):
         ],
         Binding("left_square_bracket", "interval(-1)", "Timeframe −"),
         Binding("right_square_bracket", "interval(1)", "Timeframe +"),
+        Binding(
+            "shift+left_square_bracket,left_curly_bracket",
+            "interval_all(-1)",
+            "All timeframes −",
+            show=False,
+        ),
+        Binding(
+            "shift+right_square_bracket,right_curly_bracket",
+            "interval_all(1)",
+            "All timeframes +",
+            show=False,
+        ),
         Binding("plus,equals", "price_zoom(1)", "Price +"),
         Binding("minus", "price_zoom(-1)", "Price −"),
         Binding("0", "price_zoom(0)", "Reset"),
         Binding("v", "candle_detail", "Style"),
+        *[
+            Binding(str(index), f"select_chart({index})", "Select chart", show=False)
+            for index in range(1, 10)
+        ],
+        Binding("a", "toggle_timeframe_sync", "All TF", show=False),
+        Binding("s", "toggle_cursor_sync", "Sync time", show=False),
+        Binding("z", "maximize", "Maximize", show=False),
+        Binding("p", "toggle_positions", "Positions", show=False),
+        Binding("ctrl+up", "time_zoom(1)", "Time zoom out", show=False),
+        Binding("ctrl+down", "time_zoom(-1)", "Time zoom in", show=False),
+        Binding("question_mark", "help", "Help"),
+        Binding("ctrl+p", "command_palette", "Commands", show=False),
         Binding("escape", "positions", show=False),
         Binding("j", "next_position(1)", show=False),
         Binding("k", "next_position(-1)", show=False),
@@ -129,9 +155,20 @@ class TradingApp(App[None]):
         self._layout_busy = False
         self._layout_worker = None
         self._active_extra: ExtraChart | None = None
+        self._all_timeframes = False
+        self._cursor_sync = False
+        self._maximized = False
+        self._positions_visible = True
+        self._all_interval_timer = None
+        self._syncing_cursor = False
         self.interval = interval
         self.refresh_seconds = refresh_seconds
         self._reset_data(symbol)
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if action == "select_chart" and isinstance(getattr(self, "focused", None), (Input, Select)):
+            return False
+        return True
 
     def _intervals(self) -> tuple[str, ...]:
         return tuple(getattr(self.client, "intervals", tuple(INTERVALS)))
@@ -158,6 +195,7 @@ class TradingApp(App[None]):
         self._positions_stream_task: asyncio.Task[None] | None = None
         self._positions_stream_state = "connecting" if self.client.position_streaming else "REST"
         self._positions_revision = 0
+        self._history_cache: dict[tuple[str, str], CandleStore] = {}
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="topbar"):
@@ -215,7 +253,9 @@ class TradingApp(App[None]):
             selector.value = self.interval
 
     def _setup_table(self) -> None:
-        self.query_one("#positions-pane").display = self.client.authenticated
+        self.query_one("#positions-pane").display = (
+            self.client.authenticated and self._positions_visible
+        )
         table = self.query_one(DataTable)
         with table.prevent(DataTable.RowHighlighted):
             table.clear(columns=True)
@@ -291,6 +331,21 @@ class TradingApp(App[None]):
             else self.query_one("#chart", CandleChart)
         )
 
+    def _active_frame(self) -> ChartFrame:
+        return self._active_extra or self.query_one("#chart-pane", ChartFrame)
+
+    def action_select_chart(self, index: int) -> None:
+        if self._switching or self._closing or self._layout_busy:
+            return
+        if not 1 <= index <= self._chart_count:
+            return
+        frame_id = "chart-pane" if index == 1 else f"chart-pane-{index}"
+        frame = self.query_one(f"#{frame_id}", ChartFrame)
+        if self._maximized:
+            self._select_chart(frame if isinstance(frame, ExtraChart) else None)
+            self._apply_maximized_layout()
+        frame.focus()
+
     def action_chart_count(self, count: int) -> None:
         if self._switching or self._closing:
             return
@@ -310,6 +365,8 @@ class TradingApp(App[None]):
                 with selector.prevent(Select.Changed):
                     selector.value = count
                 self._title_chart()
+                if self._maximized:
+                    self._apply_maximized_layout()
                 if count == self._desired_chart_count:
                     break
         finally:
@@ -388,6 +445,8 @@ class TradingApp(App[None]):
         else:
             self.query_one("#market-summary", Static).update(_("Loading market…"))
             self.query_one("#candle-info", Static).update("")
+        if self._maximized:
+            self._apply_maximized_layout()
         self._status()
 
     @on(ChartFrame.Selected)
@@ -488,6 +547,7 @@ class TradingApp(App[None]):
             chart = self.query_one("#chart", CandleChart)
             chart.reset_market()
             await self._reconcile_charts(self._chart_count, settings)
+            self._apply_maximized_layout()
             self._title_chart()
             self._status()
             await retired.close()
@@ -569,10 +629,11 @@ class TradingApp(App[None]):
         zoom = chart.price_zoom
         zoom_label = f" · {_('PRICE')} ×{zoom}" if zoom > 1 else ""
         style_label = _("FINE") if chart.detail else _("SOLID")
+        mode = chart.mode_label()
         self.query_one("#chart-pane").border_title = (
             f" {'1 · ' if self._chart_count > 1 else ''}{self.symbol.replace('_', ' / ')} · "
             f"{self.interval} · {_('PERPETUAL')} · "
-            f"{style_label}{zoom_label} "
+            f"{style_label}{zoom_label} · {mode} "
         )
 
     def action_candle_detail(self) -> None:
@@ -748,13 +809,20 @@ class TradingApp(App[None]):
             style=MUTED,
         )
         self.query_one("#market-summary", Static).update(text)
-        bar = market.candles[-1]
-        self.query_one("#candle-info", Static).update(
-            Text(
-                f"O {price(bar.open)}  H {price(bar.high)}  "
-                f"L {price(bar.low)}  C {price(bar.close)}"
-            )
-        )
+        self._update_candle_info()
+
+    def _update_candle_info(self, chart: CandleChart | None = None) -> None:
+        chart = chart or self._active_chart()
+        bar = chart.selected_candle()
+        if bar is None:
+            self.query_one("#candle-info", Static).update("")
+            return
+        stamp = datetime.fromtimestamp(bar.time).astimezone().strftime("%m/%d %H:%M")
+        text = Text(f"{stamp}  O {price(bar.open)}  H {price(bar.high)}  ")
+        text.append(f"L {price(bar.low)}  C {price(bar.close)}  ")
+        text.append(_("V {volume}", volume=compact(bar.volume)))
+        text.append("  " + chart.mode_label(), style=ACCENT if chart.cursor_offset() else MUTED)
+        self.query_one("#candle-info", Static).update(text)
 
     def _render_positions(self) -> None:
         table = self.query_one(DataTable)
@@ -841,6 +909,15 @@ class TradingApp(App[None]):
             )
         if self._quote_warning:
             message += " · " + self._quote_warning
+        flags = []
+        if self._all_timeframes:
+            flags.append(_("ALL TF: ON"))
+        if self._cursor_sync:
+            flags.append(_("CURSOR SYNC: ON"))
+        if self._maximized:
+            flags.append(_("MAXIMIZED"))
+        if flags:
+            message += " · " + " · ".join(flags)
         status.update(Text(message))
         status.tooltip = message
 
@@ -897,6 +974,9 @@ class TradingApp(App[None]):
     def timeframe_changed(self, event: Select.Changed) -> None:
         if self._switching or event.value not in self._intervals():
             return
+        if self._all_timeframes:
+            self.set_interval_all(event.value)
+            return
         if self._active_extra:
             if isinstance(event.value, str) and event.value != self._active_extra.interval:
                 self._active_extra.change(interval=event.value)
@@ -911,7 +991,7 @@ class TradingApp(App[None]):
         self.query_one(Input).focus()
 
     def action_positions(self) -> None:
-        if self.client.authenticated:
+        if self.client.authenticated and self.query_one("#positions-pane").display:
             self.query_one(DataTable).focus()
         else:
             frame = self._active_extra or self.query_one("#chart-pane", ChartFrame)
@@ -934,7 +1014,178 @@ class TradingApp(App[None]):
         values = list(self._intervals())
         interval = self._active_extra.interval if self._active_extra else self.interval
         index = (values.index(interval) + direction) % len(values)
+        if self._all_timeframes:
+            self._schedule_interval_all(values[index])
+            return
         self.query_one("#timeframe", Select).value = values[index]
+
+    def action_interval_all(self, direction: int) -> None:
+        if self._switching:
+            return
+        values = list(self._intervals())
+        interval = self._active_extra.interval if self._active_extra else self.interval
+        index = (values.index(interval) + direction) % len(values)
+        self._schedule_interval_all(values[index])
+
+    def _schedule_interval_all(self, interval: str) -> None:
+        if self._all_interval_timer is not None:
+            self._all_interval_timer.stop()
+        self._all_interval_timer = self.set_timer(0.2, lambda: self.set_interval_all(interval))
+
+    def set_interval_all(self, interval: str) -> None:
+        if self._switching or self._closing or interval not in self._intervals():
+            return
+        selector = self.query_one("#timeframe", Select)
+        with selector.prevent(Select.Changed):
+            selector.value = interval
+        if self.interval != interval:
+            self.interval = interval
+            self.load_market()
+        for panel in self.query(ExtraChart):
+            if panel.interval != interval:
+                panel.change(interval=interval)
+        self._status()
+
+    def action_toggle_timeframe_sync(self) -> None:
+        if self._switching:
+            return
+        self._all_timeframes = not self._all_timeframes
+        if self._all_timeframes:
+            interval = self._active_extra.interval if self._active_extra else self.interval
+            self.set_interval_all(interval)
+        self._status()
+
+    def action_time_zoom(self, direction: int) -> None:
+        if self._switching:
+            return
+        self._active_chart().zoom_time(direction)
+        if self._active_extra:
+            self._active_extra.update_title()
+        else:
+            self._title_chart()
+        self._status()
+
+    def action_toggle_cursor_sync(self) -> None:
+        if self._switching:
+            return
+        self._cursor_sync = not self._cursor_sync
+        if self._cursor_sync:
+            candle = self._active_chart().selected_candle()
+            if candle is not None:
+                self._sync_cursor_time(candle.time)
+        self._status()
+
+    def _sync_cursor_time(self, timestamp: int) -> None:
+        if self._syncing_cursor:
+            return
+        self._syncing_cursor = True
+        try:
+            for chart in self.query(CandleChart):
+                if chart is not self._active_chart():
+                    chart.select_time(timestamp, notify=False)
+            for panel in self.query(ExtraChart):
+                panel.update_title()
+        finally:
+            self._syncing_cursor = False
+
+    @on(CandleChart.CursorMoved)
+    def candle_cursor_moved(self, event: CandleChart.CursorMoved) -> None:
+        if self._switching or self._closing:
+            return
+        if event.chart is self._active_chart():
+            if self._active_extra:
+                self._active_extra.update_title()
+            else:
+                self._title_chart()
+            self._update_candle_info(event.chart)
+        if self._cursor_sync and event.candle is not None:
+            self._sync_cursor_time(event.candle.time)
+        self._status()
+
+    @on(CandleChart.HistoryRequested)
+    def candle_history_requested(self, event: CandleChart.HistoryRequested) -> None:
+        if not self._switching and not self._closing:
+            self.load_history(event.chart)
+
+    @work(group="history")
+    async def load_history(self, chart: CandleChart) -> None:
+        if chart.history_busy or not chart.market or not chart.earliest_time():
+            return
+        chart.history_busy = True
+        client, generation = self.client, self._generation
+        symbol, interval = chart.market.symbol, chart.market.interval
+        cache = self._history_cache.setdefault((symbol, interval), CandleStore())
+        try:
+            earliest = chart.earliest_time() or 0
+            cached = [bar for bar in cache.all() if bar.time < earliest]
+            if cached:
+                chart.prepend_history(cached)
+                earliest = chart.earliest_time() or earliest
+            bars = await client.history(symbol, interval, earliest)
+            cache.merge_live(bars)
+            if (
+                generation == self._generation
+                and chart.is_mounted
+                and chart.market
+                and (chart.market.symbol, chart.market.interval) == (symbol, interval)
+            ):
+                chart.prepend_history(bars)
+        except ExchangeError as exc:
+            logger.warning("Candle history unavailable (%s)", type(exc).__name__)
+        finally:
+            chart.history_busy = False
+
+    def action_maximize(self) -> None:
+        if self._switching or self._closing:
+            return
+        self._maximized = not self._maximized
+        self._apply_maximized_layout()
+        self._status()
+
+    def _apply_maximized_layout(self) -> None:
+        active = self._active_frame()
+        for frame in self.query(ChartFrame):
+            frame.display = not self._maximized or frame is active
+        grid = self.query_one("#chart-grid", Grid)
+        if self._maximized:
+            grid.styles.grid_size_columns = 1
+            grid.styles.grid_size_rows = 1
+            return
+        columns = math.ceil(math.sqrt(self._chart_count))
+        grid.styles.grid_size_columns = columns
+        grid.styles.grid_size_rows = math.ceil(self._chart_count / columns)
+
+    def action_toggle_positions(self) -> None:
+        if not self.client.authenticated or self._switching:
+            return
+        pane = self.query_one("#positions-pane")
+        pane.display = not pane.display
+        self._positions_visible = pane.display
+
+    def action_help(self) -> None:
+        rows = [
+            ("1–9", _("Select chart")),
+            ("Ctrl+1–9", _("Chart count")),
+            ("← / →", _("Previous / next candle")),
+            ("Shift+← / →", _("Move 5 candles")),
+            ("Home / End", _("Oldest candle / live")),
+            ("PageUp / PageDown", _("Move one screen")),
+            ("[ / ]", _("Timeframe of the selected chart")),
+            ("Shift+[ / ]", _("Apply timeframe to all charts")),
+            ("a", _("Toggle all-chart timeframe sync")),
+            ("s", _("Toggle cursor time sync")),
+            ("+ / - / 0", _("Price zoom / reset")),
+            ("Ctrl+↑ / ↓", _("Fewer / more candles")),
+            ("v", _("Candle style")),
+            ("z", _("Maximize the selected chart")),
+            ("p", _("Show / hide positions")),
+            ("/", _("Symbol search")),
+            ("e", _("Exchange")),
+            ("r", _("Refresh")),
+            ("Ctrl+P", _("Command palette")),
+            ("q", _("Quit")),
+        ]
+        self.push_screen(HelpScreen(rows))
 
     def action_next_position(self, direction: int) -> None:
         table = self.query_one(DataTable)

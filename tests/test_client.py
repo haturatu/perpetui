@@ -151,6 +151,34 @@ async def test_market_parses_candles_and_decimal_ticker():
         await client.close()
 
 
+async def test_history_requests_older_bars_and_filters_before_the_cursor():
+    requests = []
+
+    def handle(request):
+        requests.append(request)
+        assert request.url.params["interval"] == "Min15"
+        assert int(request.url.params["end"]) - int(request.url.params["start"]) == 900 * 3
+        return response(
+            {
+                "time": [100, 200, 300],
+                "open": [10, 11, 12],
+                "high": [12, 13, 14],
+                "low": [9, 10, 11],
+                "close": [11, 12, 13],
+                "vol": [5, 6, 7],
+            }
+        )
+
+    client = MEXCClient(transport=httpx.MockTransport(handle))
+    try:
+        bars = await client.history("BTC_USDT", "15m", 250, 3)
+        assert [bar.time for bar in bars] == [100, 200]
+        assert bars[-1].close == Decimal(12)
+        assert requests[0].url.params["end"] == "249"
+    finally:
+        await client.close()
+
+
 async def test_malformed_candles_are_an_error_not_an_empty_position_state():
     client = MEXCClient(
         transport=httpx.MockTransport(lambda request: market_response(request, malformed=True))

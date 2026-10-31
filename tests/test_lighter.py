@@ -165,6 +165,27 @@ async def test_rest_search_positions_precision_and_shared_metadata_cache():
         await client.close()
 
 
+async def test_history_requests_older_bars_and_filters_before_the_cursor():
+    class HistoryAPI(API):
+        def __call__(self, request):
+            if request.url.path == "/api/v1/candles":
+                params = dict(request.url.params)
+                assert params["market_id"] == "0"
+                assert params["resolution"] == "15m"
+                assert params["count_back"] == "2"
+                return httpx.Response(
+                    200, json={"code": 200, "c": [candle(900_000), candle(1_800_000)]}
+                )
+            return super().__call__(request)
+
+    client = LighterClient(transport=httpx.MockTransport(HistoryAPI()))
+    try:
+        bars = await client.history("BTC", "15m", 1800, 2)
+        assert [bar.time for bar in bars] == [900]
+    finally:
+        await client.close()
+
+
 async def test_public_mode_never_reads_accounts_and_testnet_endpoints_are_separate():
     api = API()
     client = LighterClient(testnet=True, transport=httpx.MockTransport(api))

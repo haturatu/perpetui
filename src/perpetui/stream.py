@@ -17,6 +17,7 @@ from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import WebSocketException
 
 from .errors import MEXCError
+from .history import MAX_HISTORY
 from .models import INTERVALS, Candle, Market, MarketEvent, number
 
 DEFAULT_WS_URL = "wss://contract.mexc.com/edge"
@@ -81,7 +82,7 @@ def apply_message(market: Market, message: dict[str, Any]) -> Market:
         candles[-1] = candle
     else:
         candles.append(candle)
-    return replace(market, candles=candles[-160:], last=candle.close)
+    return replace(market, candles=candles[-MAX_HISTORY:], last=candle.close)
 
 
 class MarketStream:

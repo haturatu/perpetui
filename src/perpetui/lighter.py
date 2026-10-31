@@ -18,6 +18,7 @@ from websockets.asyncio.client import connect
 from websockets.exceptions import WebSocketException
 
 from .errors import ExchangeError
+from .history import MAX_HISTORY
 from .i18n import _
 from .lighter_account import LighterAccount
 from .models import (
@@ -119,7 +120,7 @@ def _merge_candles(
             bars[-1] = candle
         else:
             bars.append(candle)
-    return bars[-160:]
+    return bars[-MAX_HISTORY:]
 
 
 def apply_market(market: Market, message: dict[str, Any]) -> Market:
@@ -334,6 +335,41 @@ class LighterClient:
             )
         except (KeyError, TypeError, ValueError, IndexError) as exc:
             raise ExchangeError("Invalid or empty Lighter market data") from exc
+
+    async def history(
+        self, symbol: str, interval: str, before: int, limit: int = 500
+    ) -> list[Candle]:
+        """Fetch candles strictly older than ``before`` (Unix seconds)."""
+        if interval not in self.intervals:
+            raise ExchangeError(f"{interval} is not available on Lighter")
+        metadata = await self._load_metadata()
+        symbol = self.normalize_symbol(symbol)
+        if symbol not in metadata:
+            raise ExchangeError("Unknown Lighter perpetual symbol")
+        limit = max(1, min(2000, limit))
+        seconds = INTERVALS[interval][1]
+        data = await self._get(
+            "/api/v1/candles",
+            {
+                "market_id": int(metadata[symbol]["market_id"]),
+                "resolution": interval,
+                "start_timestamp": (before - seconds * limit) * 1000,
+                "end_timestamp": (before - 1) * 1000,
+                "count_back": limit,
+            },
+        )
+        try:
+            rows = data.get("c")
+            if not isinstance(rows, list):
+                raise ValueError("Empty candles")
+            parsed = {
+                bar.time: bar
+                for bar in (parse_candle(row, interval) for row in rows)
+                if bar.time < before
+            }
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ExchangeError(f"Invalid candle history for {symbol}") from exc
+        return sorted(parsed.values(), key=lambda bar: bar.time)[-limit:]
 
     async def _heartbeat(self, websocket) -> None:
         while True:

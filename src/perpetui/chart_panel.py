@@ -10,6 +10,7 @@ from decimal import Decimal
 
 from textual import work
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.message import Message
 
@@ -24,6 +25,16 @@ logger = logging.getLogger("perpetui")
 
 class ChartFrame(Vertical):
     can_focus = True
+    BINDINGS = [
+        Binding("left", "move_candle(-1)", "Previous candle", show=False),
+        Binding("right", "move_candle(1)", "Next candle", show=False),
+        Binding("shift+left", "move_candle(-5)", "Back 5 candles", show=False),
+        Binding("shift+right", "move_candle(5)", "Forward 5 candles", show=False),
+        Binding("home", "first_candle", "First candle", show=False),
+        Binding("end", "live_candle", "Return to live", show=False),
+        Binding("pageup", "page_cursor(-1)", "Previous page", show=False),
+        Binding("pagedown", "page_cursor(1)", "Next page", show=False),
+    ]
 
     class Selected(Message):
         def __init__(self, frame: ChartFrame) -> None:
@@ -35,6 +46,21 @@ class ChartFrame(Vertical):
 
     def on_click(self) -> None:
         self.focus()
+
+    def chart(self) -> CandleChart:
+        return self.query_one(CandleChart)
+
+    def action_move_candle(self, delta: int) -> None:
+        self.chart().step_cursor(delta)
+
+    def action_first_candle(self) -> None:
+        self.chart().first_candle()
+
+    def action_live_candle(self) -> None:
+        self.chart().live_candle()
+
+    def action_page_cursor(self, direction: int) -> None:
+        self.chart().page_cursor(direction)
 
 
 class ExtraChart(ChartFrame):
@@ -82,12 +108,13 @@ class ExtraChart(ChartFrame):
             self.load_market()
 
     def update_title(self) -> None:
-        zoom = self.query_one(CandleChart).price_zoom
+        chart = self.query_one(CandleChart)
+        zoom = chart.price_zoom
         zoom_label = f" · {_('PRICE')} ×{zoom}" if zoom > 1 else ""
-        detail = _("FINE") if self.query_one(CandleChart).detail else _("SOLID")
+        detail = _("FINE") if chart.detail else _("SOLID")
         self.border_title = (
             f" {self.index} · {self.symbol.replace('_', ' / ')} · "
-            f"{self.interval} · {detail}{zoom_label} "
+            f"{self.interval} · {detail}{zoom_label} · {chart.mode_label()} "
         )
 
     def change(self, *, symbol: str | None = None, interval: str | None = None) -> None:

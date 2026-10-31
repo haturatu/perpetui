@@ -176,3 +176,26 @@ class DemoClient:
             last * Decimal(".967"),
             Decimal("284901352.71"),
         )
+
+    async def history(
+        self, symbol: str, interval: str, before: int, limit: int = 500
+    ) -> list[Candle]:
+        market = await self.market(symbol, interval)
+        seconds = INTERVALS[interval][1]
+        rng = random.Random(symbol + interval + "history")
+        anchor = float(market.candles[0].open)
+        candles = []
+        for index in range(min(limit, 2000)):
+            timestamp = before - (min(limit, 2000) - index) * seconds
+            opening = anchor * (1 + rng.uniform(-0.012, 0.012))
+            closing = opening * (1 + rng.uniform(-0.002, 0.002))
+            high = max(opening, closing) * (1 + rng.uniform(0.0002, 0.0012))
+            low = min(opening, closing) * (1 - rng.uniform(0.0002, 0.0012))
+            candles.append(
+                Candle(
+                    timestamp,
+                    *(Decimal(str(round(value, 8))) for value in (opening, high, low, closing)),
+                    Decimal(str(round(rng.uniform(100, 2400), 2))),
+                )
+            )
+        return candles

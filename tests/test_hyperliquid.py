@@ -129,6 +129,26 @@ async def test_rest_search_positions_precision_collateral_and_shared_metadata_ca
         await client.close()
 
 
+async def test_history_requests_older_bars_and_filters_before_the_cursor():
+    class HistoryAPI(API):
+        def __call__(self, request):
+            payload = json.loads(request.content)
+            if payload["type"] == "candleSnapshot":
+                self.requests.append(payload)
+                span = payload["req"]["endTime"] - payload["req"]["startTime"]
+                assert span == (900 * 2 - 1) * 1000
+                return httpx.Response(200, json=[candle(900_000), candle(1_800_000)])
+            return super().__call__(request)
+
+    api = HistoryAPI()
+    client = HyperliquidClient(transport=httpx.MockTransport(api))
+    try:
+        bars = await client.history("BTC", "15m", 1800, 2)
+        assert [bar.time for bar in bars] == [900]
+    finally:
+        await client.close()
+
+
 async def test_public_mode_never_reads_accounts_and_testnet_endpoints_are_separate():
     api = API()
     client = HyperliquidClient(testnet=True, transport=httpx.MockTransport(api))

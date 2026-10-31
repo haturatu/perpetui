@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+from bisect import bisect_right
+from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
 
@@ -11,8 +13,10 @@ from rich.cells import cell_len
 from rich.console import Console
 from rich.style import Style
 from rich.text import Text
+from textual.message import Message
 from textual.widget import Widget
 
+from .history import CandleStore
 from .i18n import _, current_language
 from .models import INTERVALS, Candle, Market, price
 
@@ -94,6 +98,29 @@ def _draw_candles(
         )
 
 
+def candle_window(
+    candles: list[Candle], count: int, cursor_time: int | None = None
+) -> tuple[list[Candle], int | None]:
+    """Return the visible slice and the cursor index inside that slice."""
+    if not candles:
+        return [], None
+    count = max(1, min(len(candles), count))
+    if cursor_time is None:
+        start = len(candles) - count
+    else:
+        index = bisect_right([bar.time for bar in candles], cursor_time) - 1
+        index = max(0, min(len(candles) - 1, index))
+        start = max(0, min(index - count // 2, len(candles) - count))
+    window = candles[start : start + count]
+    if cursor_time is None:
+        return window, None
+    index = next(
+        (i for i, bar in enumerate(window) if bar.time >= cursor_time),
+        len(window) - 1,
+    )
+    return window, index
+
+
 def build_chart(
     market: Market,
     entry: Decimal | None,
@@ -102,10 +129,13 @@ def build_chart(
     zoom: int = 1,
     anchor: Decimal | None = None,
     detail: bool = True,
+    cursor_time: int | None = None,
+    time_zoom: int = 1,
 ) -> Text:
     """Build synchronously: Plotext's public figure is shared across its session."""
     label_width = max(12, len(price(max(bar.high for bar in market.candles))) + 2)
-    candles = market.candles[-max(1, (width - label_width - 1) // 2) :]
+    count = max(1, (width - label_width - 1) // 2) * max(1, time_zoom)
+    candles = candle_window(market.candles, count, cursor_time)[0]
     seconds = INTERVALS[market.interval][1]
     times = [bar.time for bar in candles]
     low, high = min(bar.low for bar in candles), max(bar.high for bar in candles)
@@ -142,6 +172,15 @@ def build_chart(
 
     prices.ruler("y", "right").lim(float(low), float(high))
     _draw_candles(prices, candles, x_limits, width - label_width - 1, (low, high), detail)
+    if cursor_time is not None and any(bar.time == cursor_time for bar in candles):
+        prices.line(
+            float(cursor_time),
+            orientation=1,
+            relative=False,
+            style="dotted",
+            pixel=_pixel(ACCENT),
+            yside="right",
+        )
 
     # Replace nearby tick labels with current price / entry, keeping overlays readable.
     span = high - low
@@ -211,13 +250,38 @@ class CandleChart(Widget):
     bars_visible = 0
     price_zoom = 1
     detail = True
+    cursor_time: int | None = None
+    time_zoom = 1
+    history_busy = False
     _zoom_anchor: Decimal | None = None
     _zoom_market_key: tuple[str, str] | None = None
     _cache_key: tuple | None = None
     _cached_plot: Text | None = None
 
+    class CursorMoved(Message):
+        def __init__(self, chart: CandleChart, candle: Candle | None) -> None:
+            super().__init__()
+            self.chart = chart
+            self.candle = candle
+
+    class HistoryRequested(Message):
+        def __init__(self, chart: CandleChart) -> None:
+            super().__init__()
+            self.chart = chart
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._store = CandleStore()
+        self._market_key: tuple[str, str] | None = None
+
+    def candles(self) -> list[Candle]:
+        return self._store.all()
+
     def reset_market(self) -> None:
         self.market, self.entry = None, None
+        self._market_key = None
+        self._store.reset([])
+        self.cursor_time, self.time_zoom = None, 1
         self._zoom_anchor, self._zoom_market_key = None, None
         self._cache_key, self._cached_plot = None, None
         self.message = _("Loading market data…")
@@ -225,6 +289,12 @@ class CandleChart(Widget):
 
     def set_market(self, market: Market, entry: Decimal | None = None) -> None:
         key = (market.symbol, market.interval)
+        if key != self._market_key:
+            self._market_key = key
+            self.cursor_time, self.time_zoom = None, 1
+            self._store.reset(market.candles)
+        else:
+            self._store.merge_live(market.candles)
         if (
             self.price_zoom > 1
             and market.candles
@@ -235,10 +305,100 @@ class CandleChart(Widget):
         self.market, self.entry = market, entry
         self.refresh()
 
+    def prepend_history(self, candles: list[Candle]) -> None:
+        if self._store.prepend(candles):
+            self._cache_key, self._cached_plot = None, None
+            self.refresh()
+
+    def earliest_time(self) -> int | None:
+        return self._store.earliest_time()
+
+    def selected_candle(self) -> Candle | None:
+        candles = self._store.all()
+        if not candles:
+            return None
+        if self.cursor_time is None:
+            return candles[-1]
+        return self._store.nearest(self.cursor_time)
+
+    def cursor_offset(self) -> int:
+        candles = self._store.all()
+        if self.cursor_time is None or not candles:
+            return 0
+        index = self._store.index_at_or_before(self.cursor_time)
+        return 0 if index is None else index - (len(candles) - 1)
+
+    def mode_label(self) -> str:
+        offset = self.cursor_offset()
+        return _("LIVE") if offset == 0 else _("HISTORY") + f" {offset:+d}"
+
+    def _move(self, timestamp: int | None, *, notify: bool = True) -> None:
+        if timestamp == self.cursor_time:
+            return
+        self.cursor_time = timestamp
+        self._cache_key, self._cached_plot = None, None
+        self.refresh()
+        if notify:
+            self.post_message(self.CursorMoved(self, self.selected_candle()))
+        if self.needs_history():
+            self.post_message(self.HistoryRequested(self))
+
+    def step_cursor(self, delta: int) -> None:
+        candles = self._store.all()
+        if not candles:
+            return
+        index = (
+            len(candles) - 1
+            if self.cursor_time is None
+            else self._store.index_at_or_before(self.cursor_time)
+        )
+        if index is None:
+            return
+        target = max(0, min(len(candles) - 1, index + delta))
+        self._move(None if target == len(candles) - 1 else candles[target].time)
+
+    def first_candle(self) -> None:
+        candles = self._store.all()
+        if candles:
+            self._move(candles[0].time)
+
+    def live_candle(self) -> None:
+        self._move(None)
+
+    def page_cursor(self, direction: int) -> None:
+        self.step_cursor(direction * max(1, self.bars_visible - 2))
+
+    def select_time(self, timestamp: int | None, *, notify: bool = True) -> None:
+        if timestamp is None:
+            self._move(None, notify=notify)
+            return
+        candles = self._store.all()
+        index = self._store.index_at_or_before(timestamp)
+        if not candles or index is None:
+            return
+        self._move(None if index == len(candles) - 1 else candles[index].time, notify=notify)
+
+    def zoom_time(self, direction: int) -> None:
+        steps = (1, 2, 3, 4, 6, 8)
+        if direction == 0 or self.time_zoom not in steps:
+            self.time_zoom = 1
+        else:
+            index = steps.index(self.time_zoom) + (1 if direction > 0 else -1)
+            self.time_zoom = steps[max(0, min(len(steps) - 1, index))]
+        self._cache_key, self._cached_plot = None, None
+        self.refresh()
+
+    def needs_history(self) -> bool:
+        if self.history_busy or self.cursor_time is None:
+            return False
+        index = self._store.index_at_or_before(self.cursor_time)
+        return index is not None and index <= max(5, self.bars_visible // 3)
+
     def zoom_price(self, direction: int) -> None:
-        if direction > 0 and self.price_zoom == 1 and self.market and self.market.candles:
-            self._zoom_anchor = self.market.candles[-1].close
-            self._zoom_market_key = (self.market.symbol, self.market.interval)
+        candle = self.selected_candle()
+        if direction > 0 and self.price_zoom == 1 and candle:
+            self._zoom_anchor = candle.close
+            self._zoom_market_key = self._market_key
         self.price_zoom = (
             1
             if direction == 0
@@ -257,7 +417,8 @@ class CandleChart(Widget):
 
     def render(self) -> Text:
         width, height = self.content_size
-        if not self.market or not self.market.candles:
+        candles = self._store.all()
+        if not self.market or not candles:
             self.bars_visible = 0
             return Text("\n  " + _(self.message), style=MUTED)
         if width < 30 or height < 6:
@@ -272,18 +433,26 @@ class CandleChart(Widget):
             self._zoom_anchor,
             self.detail,
             current_language(),
+            self.cursor_time,
+            self.time_zoom,
+            self._store.version,
         )
         if self._cache_key != key or self._cached_plot is None:
+            plot_market = replace(self.market, candles=candles)
             self._cached_plot = build_chart(
-                self.market,
+                plot_market,
                 self.entry,
                 width,
                 height,
                 self.price_zoom,
                 self._zoom_anchor,
                 self.detail,
+                self.cursor_time,
+                self.time_zoom,
             )
             self._cache_key = key
-        label_width = max(12, len(price(max(bar.high for bar in self.market.candles))) + 2)
-        self.bars_visible = min(len(self.market.candles), max(1, (width - label_width - 1) // 2))
+        label_width = max(12, len(price(max(bar.high for bar in candles))) + 2)
+        count = max(1, (width - label_width - 1) // 2) * max(1, self.time_zoom)
+        window = candle_window(candles, count, self.cursor_time)[0]
+        self.bars_visible = len(window)
         return self._cached_plot
