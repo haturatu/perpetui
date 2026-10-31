@@ -253,6 +253,7 @@ class CandleChart(Widget):
     cursor_time: int | None = None
     time_zoom = 1
     history_busy = False
+    history_exhausted = False
     _zoom_anchor: Decimal | None = None
     _zoom_market_key: tuple[str, str] | None = None
     _cache_key: tuple | None = None
@@ -282,6 +283,7 @@ class CandleChart(Widget):
         self._market_key = None
         self._store.reset([])
         self.cursor_time, self.time_zoom = None, 1
+        self.history_exhausted = False
         self._zoom_anchor, self._zoom_market_key = None, None
         self._cache_key, self._cached_plot = None, None
         self.message = _("Loading market data…")
@@ -292,6 +294,7 @@ class CandleChart(Widget):
         if key != self._market_key:
             self._market_key = key
             self.cursor_time, self.time_zoom = None, 1
+            self.history_exhausted = False
             self._store.reset(market.candles)
         else:
             self._store.merge_live(market.candles)
@@ -305,10 +308,15 @@ class CandleChart(Widget):
         self.market, self.entry = market, entry
         self.refresh()
 
-    def prepend_history(self, candles: list[Candle]) -> None:
-        if self._store.prepend(candles):
+    def prepend_history(self, candles: list[Candle]) -> bool:
+        added = self._store.prepend(candles)
+        if added:
             self._cache_key, self._cached_plot = None, None
             self.refresh()
+        return added
+
+    def mark_history_exhausted(self) -> None:
+        self.history_exhausted = True
 
     def earliest_time(self) -> int | None:
         return self._store.earliest_time()
@@ -389,7 +397,7 @@ class CandleChart(Widget):
         self.refresh()
 
     def needs_history(self) -> bool:
-        if self.history_busy or self.cursor_time is None:
+        if self.history_exhausted or self.history_busy or self.cursor_time is None:
             return False
         index = self._store.index_at_or_before(self.cursor_time)
         return index is not None and index <= max(5, self.bars_visible // 3)

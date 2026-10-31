@@ -160,6 +160,7 @@ class TradingApp(App[None]):
         self._maximized = False
         self._positions_visible = True
         self._all_interval_timer = None
+        self._pending_interval: str | None = None
         self._syncing_cursor = False
         self.interval = interval
         self.refresh_seconds = refresh_seconds
@@ -174,6 +175,10 @@ class TradingApp(App[None]):
         return tuple(getattr(self.client, "intervals", tuple(INTERVALS)))
 
     def _reset_data(self, symbol: str | None = None) -> None:
+        if self._all_interval_timer is not None:
+            self._all_interval_timer.stop()
+            self._all_interval_timer = None
+        self._pending_interval = None
         intervals = self._intervals()
         if self.interval not in intervals:
             self.interval = "15m" if "15m" in intervals else intervals[0]
@@ -976,6 +981,7 @@ class TradingApp(App[None]):
         if self._switching or event.value not in self._intervals():
             return
         if self._all_timeframes:
+            self._pending_interval = None
             self.set_interval_all(event.value)
             return
         if self._active_extra:
@@ -1013,7 +1019,9 @@ class TradingApp(App[None]):
         if self._switching:
             return
         values = list(self._intervals())
-        interval = self._active_extra.interval if self._active_extra else self.interval
+        interval = self._pending_interval or (
+            self._active_extra.interval if self._active_extra else self.interval
+        )
         index = (values.index(interval) + direction) % len(values)
         if self._all_timeframes:
             self._schedule_interval_all(values[index])
@@ -1024,18 +1032,23 @@ class TradingApp(App[None]):
         if self._switching:
             return
         values = list(self._intervals())
-        interval = self._active_extra.interval if self._active_extra else self.interval
+        interval = self._pending_interval or (
+            self._active_extra.interval if self._active_extra else self.interval
+        )
         index = (values.index(interval) + direction) % len(values)
         self._schedule_interval_all(values[index])
 
     def _schedule_interval_all(self, interval: str) -> None:
+        self._pending_interval = interval
         if self._all_interval_timer is not None:
             self._all_interval_timer.stop()
         self._all_interval_timer = self.set_timer(0.2, lambda: self.set_interval_all(interval))
 
     def set_interval_all(self, interval: str) -> None:
         if self._switching or self._closing or interval not in self._intervals():
+            self._pending_interval = None
             return
+        self._pending_interval = None
         selector = self.query_one("#timeframe", Select)
         with selector.prevent(Select.Changed):
             selector.value = interval
@@ -1052,6 +1065,7 @@ class TradingApp(App[None]):
             return
         self._all_timeframes = not self._all_timeframes
         if self._all_timeframes:
+            self._pending_interval = None
             interval = self._active_extra.interval if self._active_extra else self.interval
             self.set_interval_all(interval)
         self._status()
@@ -1110,7 +1124,12 @@ class TradingApp(App[None]):
 
     @work(group="history")
     async def load_history(self, chart: CandleChart) -> None:
-        if chart.history_busy or not chart.market or not chart.earliest_time():
+        if (
+            chart.history_exhausted
+            or chart.history_busy
+            or not chart.market
+            or not chart.earliest_time()
+        ):
             return
         chart.history_busy = True
         client, generation = self.client, self._generation
@@ -1119,18 +1138,23 @@ class TradingApp(App[None]):
         try:
             earliest = chart.earliest_time() or 0
             cached = [bar for bar in cache.all() if bar.time < earliest]
+            if cached and not chart.prepend_history(cached):
+                chart.mark_history_exhausted()
+                return
             if cached:
-                chart.prepend_history(cached)
                 earliest = chart.earliest_time() or earliest
             bars = await client.history(symbol, interval, earliest)
             cache.merge_live(bars)
             if (
-                generation == self._generation
-                and chart.is_mounted
-                and chart.market
-                and (chart.market.symbol, chart.market.interval) == (symbol, interval)
+                generation != self._generation
+                or not chart.is_mounted
+                or not chart.market
+                or (chart.market.symbol, chart.market.interval) != (symbol, interval)
             ):
-                chart.prepend_history(bars)
+                return
+            older = [bar for bar in bars if bar.time < earliest]
+            if not older or not chart.prepend_history(older):
+                chart.mark_history_exhausted()
         except ExchangeError as exc:
             logger.warning("Candle history unavailable (%s)", type(exc).__name__)
         finally:

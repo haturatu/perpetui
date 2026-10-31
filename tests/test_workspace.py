@@ -454,6 +454,43 @@ async def test_all_chart_sync_cursor_sync_maximize_positions_and_help():
         assert type(app.screen).__name__ != "HelpScreen"
 
 
+async def test_rapid_all_interval_keys_advance_from_the_pending_target():
+    app = TradingApp(DemoClient(), refresh_seconds=3600)
+    async with app.run_test(size=(160, 50)) as pilot:
+        await settle(app, pilot)
+        app.action_interval_all(1)
+        app.action_interval_all(1)
+        app.action_interval_all(1)
+        await pilot.pause(0.25)
+        await settle(app, pilot)
+        assert app.interval == "4h"
+
+
+async def test_empty_history_stops_repeated_backfill_requests():
+    class NoHistory(DemoClient):
+        def __init__(self):
+            super().__init__()
+            self.history_calls = 0
+
+        async def history(self, symbol, interval, before, limit=500):
+            self.history_calls += 1
+            return []
+
+    client = NoHistory()
+    app = TradingApp(client, refresh_seconds=3600)
+    async with app.run_test(size=(120, 40)) as pilot:
+        await settle(app, pilot)
+        chart = app.query_one(CandleChart)
+        await pilot.press("1", "home")
+        await settle(app, pilot)
+        assert chart.history_exhausted
+        calls = client.history_calls
+        assert calls == 1
+        await pilot.press("right", "left")
+        await settle(app, pilot)
+        assert client.history_calls == calls
+
+
 async def test_enter_applies_the_already_highlighted_position_to_the_selected_pane():
     app = TradingApp(DemoClient(), refresh_seconds=3600)
     async with app.run_test(size=(120, 40)) as pilot:
