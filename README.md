@@ -1,3 +1,28 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [perpetui](#perpetui)
+  - [依存関係](#%E4%BE%9D%E5%AD%98%E9%96%A2%E4%BF%82)
+  - [起動](#%E8%B5%B7%E5%8B%95)
+  - [Go ランチャーとインストール](#go-%E3%83%A9%E3%83%B3%E3%83%81%E3%83%A3%E3%83%BC%E3%81%A8%E3%82%A4%E3%83%B3%E3%82%B9%E3%83%88%E3%83%BC%E3%83%AB)
+  - [取引所の選択](#%E5%8F%96%E5%BC%95%E6%89%80%E3%81%AE%E9%81%B8%E6%8A%9E)
+  - [表示言語](#%E8%A1%A8%E7%A4%BA%E8%A8%80%E8%AA%9E)
+  - [複数チャート](#%E8%A4%87%E6%95%B0%E3%83%81%E3%83%A3%E3%83%BC%E3%83%88)
+    - [Konsole のキー設定](#konsole-%E3%81%AE%E3%82%AD%E3%83%BC%E8%A8%AD%E5%AE%9A)
+  - [リアルタイム更新](#%E3%83%AA%E3%82%A2%E3%83%AB%E3%82%BF%E3%82%A4%E3%83%A0%E6%9B%B4%E6%96%B0)
+    - [Hyperliquid](#hyperliquid)
+    - [Lighter](#lighter)
+    - [MEXC](#mexc)
+    - [接続設定](#%E6%8E%A5%E7%B6%9A%E8%A8%AD%E5%AE%9A)
+  - [Hyperliquid の設定](#hyperliquid-%E3%81%AE%E8%A8%AD%E5%AE%9A)
+  - [Lighter の設定](#lighter-%E3%81%AE%E8%A8%AD%E5%AE%9A)
+  - [MEXC の設定](#mexc-%E3%81%AE%E8%A8%AD%E5%AE%9A)
+  - [操作](#%E6%93%8D%E4%BD%9C)
+  - [API・開発](#api%E3%83%BB%E9%96%8B%E7%99%BA)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # perpetui
 
 Hyperliquid・Lighter・MEXC の先物チャート・保有ポジションを表示する Python 製 TUI です。
