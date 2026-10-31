@@ -4,11 +4,8 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import aclosing, suppress
+from contextlib import aclosing
 from typing import Any
-
-from websockets.asyncio.client import connect
-from websockets.exceptions import WebSocketException
 
 from perpetui.domain.models import (
     Market,
@@ -17,7 +14,12 @@ from perpetui.domain.models import (
 )
 from perpetui.errors import ExchangeError
 from perpetui.exchanges.lighter.parser import apply_market, parse_positions
-from perpetui.exchanges.websocket import HistoryGap, decode_message
+from perpetui.exchanges.websocket import (
+    HistoryGap,
+    decode_message,
+    retrying_stream,
+    websocket_connection,
+)
 
 logger = logging.getLogger("perpetui")
 
@@ -35,77 +37,56 @@ class LighterClientStreams:
         apply: Callable[[Any, dict[str, Any]], Any],
         seed: Any = None,
     ) -> AsyncIterator[tuple[str, Any]]:
-        retry, delay = False, self.retry_delay
-        while True:
-            yield ("reconnecting" if retry else "connecting"), None
-            try:
-                async with connect(
-                    self.websocket_url,
-                    open_timeout=self.timeout,
-                    close_timeout=1,
-                    ping_interval=None,
-                    max_size=4 * 1024 * 1024,
-                ) as ws:
-                    heartbeat = asyncio.create_task(self._heartbeat(ws))
-                    try:
-                        while True:
-                            message = decode_message(
-                                await asyncio.wait_for(ws.recv(), self.stale_after)
-                            )
-                            kind = message.get("type")
-                            if kind == "connected":
-                                break
-                            if kind == "ping":
-                                await ws.send('{"type":"pong"}')
-                        for channel in subscriptions:
-                            await ws.send(json.dumps({"type": "subscribe", "channel": channel}))
-                        state = await load() if retry or seed is None else seed
-                        if retry:
-                            yield "reconnecting", state
-                        while True:
-                            message = decode_message(
-                                await asyncio.wait_for(ws.recv(), self.stale_after)
-                            )
-                            kind = message.get("type")
-                            if kind == "ping":
-                                await ws.send('{"type":"pong"}')
-                                continue
-                            if kind == "pong":
-                                continue
-                            if "error" in message:
-                                raise ExchangeError("Lighter WebSocket request rejected")
-                            try:
-                                updated = apply(state, message)
-                            except HistoryGap:
-                                state = await load()
-                                yield "live", state
-                                continue
-                            if updated is not None:
-                                state = updated
-                                delay = self.retry_delay
-                                yield "live", state
-                    finally:
-                        heartbeat.cancel()
-                        with suppress(asyncio.CancelledError, WebSocketException, OSError):
-                            await heartbeat
-            except (
-                WebSocketException,
-                OSError,
-                TimeoutError,
-                ExchangeError,
-                ValueError,
-                KeyError,
-                TypeError,
-                IndexError,
-                EOFError,
-            ) as exc:
-                logger.warning(
-                    "Lighter WebSocket interrupted (%s); reconnecting", type(exc).__name__
-                )
-                retry = True
-                yield "reconnecting", None
-                await asyncio.sleep(delay)
-                delay = min(delay * 2, 30)
+        async with aclosing(
+            retrying_stream(
+                lambda retry: self._watch_once(subscriptions, load, apply, seed, retry=retry),
+                exchange=self.exchange,
+                retry_delay=self.retry_delay,
+            )
+        ) as events:
+            async for event in events:
+                yield event
+
+    async def _watch_once(
+        self,
+        subscriptions: list[str],
+        load: Callable[[], Awaitable[Any]],
+        apply: Callable[[Any, dict[str, Any]], Any],
+        seed: Any = None,
+        retry: bool = False,
+    ) -> AsyncIterator[tuple[str, Any]]:
+        async with websocket_connection(self.websocket_url, self.timeout, self._heartbeat) as ws:
+            while True:
+                message = decode_message(await asyncio.wait_for(ws.recv(), self.stale_after))
+                kind = message.get("type")
+                if kind == "connected":
+                    break
+                if kind == "ping":
+                    await ws.send('{"type":"pong"}')
+            for channel in subscriptions:
+                await ws.send(json.dumps({"type": "subscribe", "channel": channel}))
+            state = await load() if retry or seed is None else seed
+            if retry:
+                yield "reconnecting", state
+            while True:
+                message = decode_message(await asyncio.wait_for(ws.recv(), self.stale_after))
+                kind = message.get("type")
+                if kind == "ping":
+                    await ws.send('{"type":"pong"}')
+                    continue
+                if kind == "pong":
+                    continue
+                if "error" in message:
+                    raise ExchangeError("Lighter WebSocket request rejected")
+                try:
+                    updated = apply(state, message)
+                except HistoryGap:
+                    state = await load()
+                    yield "live", state
+                    continue
+                if updated is not None:
+                    state = updated
+                    yield "live", state
 
     async def stream_market(self, seed: Market) -> AsyncIterator[MarketEvent]:
         metadata = await self._load_metadata()

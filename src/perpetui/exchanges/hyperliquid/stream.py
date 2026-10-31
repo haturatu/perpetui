@@ -5,11 +5,8 @@ import json
 import logging
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import aclosing, suppress
+from contextlib import aclosing
 from typing import Any
-
-from websockets.asyncio.client import connect
-from websockets.exceptions import WebSocketException
 
 from perpetui.domain.models import (
     Market,
@@ -18,7 +15,12 @@ from perpetui.domain.models import (
 )
 from perpetui.errors import ExchangeError
 from perpetui.exchanges.hyperliquid.parser import apply_market, parse_positions
-from perpetui.exchanges.websocket import HistoryGap, decode_message
+from perpetui.exchanges.websocket import (
+    HistoryGap,
+    decode_message,
+    retrying_stream,
+    websocket_connection,
+)
 
 logger = logging.getLogger("perpetui")
 
@@ -37,69 +39,51 @@ class HyperliquidClientStreams:
         seed: Any = None,
         idle_ok: bool = False,
     ) -> AsyncIterator[tuple[str, Any]]:
-        retry, delay = False, self.retry_delay
-        while True:
-            yield ("reconnecting" if retry else "connecting"), None
-            try:
-                async with connect(
-                    self.websocket_url,
-                    open_timeout=self.timeout,
-                    close_timeout=1,
-                    ping_interval=None,
-                    max_size=4 * 1024 * 1024,
-                ) as ws:
-                    heartbeat = asyncio.create_task(self._heartbeat(ws))
-                    try:
-                        for subscription in subscriptions:
-                            await ws.send(
-                                json.dumps({"method": "subscribe", "subscription": subscription})
-                            )
-                        state = await load() if retry or seed is None else seed
-                        if retry:
-                            yield "reconnecting", state
-                        last_update = time.monotonic()
-                        while True:
-                            message = decode_message(
-                                await asyncio.wait_for(ws.recv(), self.stale_after)
-                            )
-                            if message.get("channel") == "error":
-                                raise ExchangeError("Hyperliquid WebSocket subscription rejected")
-                            if not idle_ok and time.monotonic() - last_update > self.stale_after:
-                                raise TimeoutError("Hyperliquid updates stopped")
-                            try:
-                                updated = apply(state, message)
-                            except HistoryGap:
-                                state = await load()
-                                yield "live", state
-                                last_update = time.monotonic()
-                                continue
-                            if updated is not None:
-                                state = updated
-                                last_update = time.monotonic()
-                                delay = self.retry_delay
-                                yield "live", state
-                    finally:
-                        heartbeat.cancel()
-                        with suppress(asyncio.CancelledError, WebSocketException, OSError):
-                            await heartbeat
-            except (
-                WebSocketException,
-                OSError,
-                TimeoutError,
-                ExchangeError,
-                ValueError,
-                KeyError,
-                TypeError,
-                IndexError,
-                EOFError,
-            ) as exc:
-                logger.warning(
-                    "Hyperliquid WebSocket interrupted (%s); reconnecting", type(exc).__name__
-                )
-                retry = True
-                yield "reconnecting", None
-                await asyncio.sleep(delay)
-                delay = min(delay * 2, 30)
+        async with aclosing(
+            retrying_stream(
+                lambda retry: self._watch_once(
+                    subscriptions, load, apply, seed, retry=retry, idle_ok=idle_ok
+                ),
+                exchange=self.exchange,
+                retry_delay=self.retry_delay,
+            )
+        ) as events:
+            async for event in events:
+                yield event
+
+    async def _watch_once(
+        self,
+        subscriptions: list[dict[str, Any]],
+        load: Callable[[], Awaitable[Any]],
+        apply: Callable[[Any, dict[str, Any]], Any],
+        seed: Any = None,
+        retry: bool = False,
+        idle_ok: bool = False,
+    ) -> AsyncIterator[tuple[str, Any]]:
+        async with websocket_connection(self.websocket_url, self.timeout, self._heartbeat) as ws:
+            for subscription in subscriptions:
+                await ws.send(json.dumps({"method": "subscribe", "subscription": subscription}))
+            state = await load() if retry or seed is None else seed
+            if retry:
+                yield "reconnecting", state
+            last_update = time.monotonic()
+            while True:
+                message = decode_message(await asyncio.wait_for(ws.recv(), self.stale_after))
+                if message.get("channel") == "error":
+                    raise ExchangeError("Hyperliquid WebSocket subscription rejected")
+                if not idle_ok and time.monotonic() - last_update > self.stale_after:
+                    raise TimeoutError("Hyperliquid updates stopped")
+                try:
+                    updated = apply(state, message)
+                except HistoryGap:
+                    state = await load()
+                    yield "live", state
+                    last_update = time.monotonic()
+                    continue
+                if updated is not None:
+                    state = updated
+                    last_update = time.monotonic()
+                    yield "live", state
 
     async def stream_market(self, seed: Market) -> AsyncIterator[MarketEvent]:
         subscriptions = [
