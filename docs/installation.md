@@ -1,111 +1,131 @@
-# インストール
+# インストールと起動
 
-## 依存関係
+perpetui は TUI の本体が Python、起動用のコマンドが Go という構成です。
 
-実行時:
+少し回りくどく見えるかもしれませんが、普段は `perpetui` という一つのコマンドで使えます。Go ランチャーが Python 環境を探して、Textual の画面を起動する仕組みです。
 
-- Python 3.11 以上
-- Python パッケージ（[pyproject.toml](../pyproject.toml) とロックファイルで管理）
-- ANSI / UTF-8 に対応した端末（120列 × 40行以上を推奨）
-- 任意: `mexc-cli`・`hl`・`lighter` の保存済みアカウント、または各取引所の環境変数
+## 必要なもの
 
-ビルド・開発:
+| 項目 | 用途 |
+| --- | --- |
+| Python 3.11 以上 | TUI 本体 |
+| Go 1.23 以上 | Go ランチャーのビルド。インストール済みバイナリの実行には不要 |
+| make | セットアップとインストール |
+| ANSI / UTF-8 対応の端末 | チャートと画面の表示 |
+| uv | Python 依存関係の取得。未導入なら venv + pip を使用 |
+| pip 25.1 以上 | pip を使用する場合 |
+| git | ソースコードの取得 |
 
-- Go 1.23 以上（Cobra ランチャーのビルド時のみ。インストール済みバイナリの実行には不要）
-- `make`
-- [uv](https://docs.astral.sh/uv/)（任意。ない場合は `venv` + pip を使用）
-- pip 25.1 以上（pip フォールバック時）
-- git（ソースを取得する場合）
+120 列 × 40 行以上の端末を推奨しています。小さな端末でも動作しますが、複数チャートは表示領域が足りなくなります。
 
-## 起動
+取引所のアカウント設定は必須ではありません。相場を見るだけなら認証せずに使えます。
 
-依存解決には [uv](https://docs.astral.sh/uv/) があると高速です。uv がない場合は venv + pip を使用します。
+## 普段使う環境にインストールする
 
-```bash
+一番簡単なのは `make install` です。
+
+```sh
+git clone https://github.com/haturatu/perpetui.git
+cd perpetui
+make install
+```
+
+既定では次の場所にインストールします。
+
+| 配置先 | 内容 |
+| --- | --- |
+| `~/.local/bin/perpetui` | Go ランチャー |
+| `~/.local/share/perpetui/venv` | アプリ専用の Python 環境 |
+| `~/.local/share/bash-completion/completions/perpetui` など | シェル補完 |
+| `~/.local/share/man/man1/` | man ページ |
+
+`~/.local/bin` に PATH が通っていなければ追加してください。
+
+```sh
+export PATH="$HOME/.local/bin:$PATH"
+perpetui --demo
+```
+
+`PREFIX`、`BINDIR`、`DATADIR` を指定すると配置先を変更できます。アンインストールには `make uninstall` を使います。
+
+```sh
+make install PREFIX="$HOME/.local"
+make uninstall
+```
+
+インストールした後は `uv` の実行や Go のビルドは不要です。ただし、**インストール時に作成した専用の Python 環境は必要**です。バイナリだけを別の場所へ移した場合は、`make install` で入れ直してください。
+
+## インストールせずに開発環境から使う
+
+開発中ならローカルに `.venv` を作る方が扱いやすいです。
+
+```sh
+make setup
+make run
+```
+
+`make setup` は uv が見つかれば `uv sync --locked --dev` を使います。なければ venv と pip でセットアップします。
+
+uv を使う場合は、次のように直接起動できます。
+
+```sh
 uv sync --dev
 uv run perpetui --demo
 uv run perpetui
 ```
 
-pip を使用する場合:
+pip を使う場合も対応しています。
 
-```bash
+```sh
 python3 -m venv .venv
 .venv/bin/pip install -e .
 .venv/bin/perpetui --demo
 ```
 
-```bash
-perpetui --demo-empty             # ポジションなし → BTCのサンプルチャート
-perpetui --public                 # 認証設定を読まず公開相場のみ表示
+どちらを使うか明示したい場合は `make setup PY_TOOL=uv` または `make setup PY_TOOL=pip` とします。pip 経路でも `requirements.lock` と `requirements-dev.lock` の固定バージョンを使います。
+
+### Makefile でできること
+
+```sh
+make setup         # Python 環境の準備
+make build         # Go ランチャーを build/perpetui にビルド
+make run           # ビルドして起動
+make demo          # サンプルデータで起動
+make test          # Python / Go のテスト
+make lint          # Ruff / go vet / gofmt の検査
+make completions   # Bash / Zsh / Fish / PowerShell の補完を生成
+make man           # man ページを生成
+make lock          # pip 用ロックファイルを更新
+```
+
+`make run` は実行のたびに `build` を呼び出します。ビルド済みのインストール版を使うだけなら、`perpetui` を直接実行した方が簡単です。
+
+## アカウントなしでも使える
+
+```sh
+perpetui --demo-empty
+perpetui --public
 perpetui --symbol SOL --interval 1h --refresh 10
 perpetui --account main
-perpetui --no-websocket           # チャート・ポジションともRESTで定期取得
+perpetui --no-websocket
 ```
 
-認証情報が未設定の場合は、公開データでチャートを表示し、保有ポジション欄を非表示にします。
-`--public` でも同じ表示になります。空いた領域はチャートに使用します。
-認証情報が設定されていても、保有ポジションが 0 件の場合は一覧を折りたたみます。
-Hyperliquid は秘密鍵なしでも、監視対象のウォレットアドレスがあればポジションを表示できます。
-Lighter も秘密鍵や認証トークンなしで、アカウント番号だけでポジションを表示できます。
+`--demo-empty` はポジションなしのサンプル画面、`--public` は認証設定を使わず公開相場だけを表示します。`--no-websocket` では WebSocket を使わず REST で定期的に取得します。
 
-## Go ランチャーとインストール
+アカウントが設定されていなければポジション欄を使わず、画面の領域をチャートに回します。ポジションが 0 件の場合も一覧を折りたたみます。
 
-正式な CLI エントリーポイントは Go 製の `perpetui` です。Go ランチャーは引数をそのまま
-Python の Textual アプリへ渡し、Unix では `exec` でプロセスを置き換えます。
-TUI 本体はこれまでどおり Python 実装です。
+Hyperliquid はウォレットアドレス、Lighter はアカウント番号があれば秘密鍵なしで監視できます。MEXC のポジション監視には API 認証が必要です。詳細は[取引所の設定](exchanges.md)を参照してください。
 
-```bash
-make setup          # .venv 作成 + Python 依存解決（uv があれば uv、なければ venv + pip）
-make build          # Go バイナリを build/perpetui にビルド
-make run            # Go ランチャー経由で TUI を起動
-make demo           # サンプルデータで起動
-make test           # Python / Go のテスト
-make lint           # Ruff / go vet / gofmt
-make completions    # Bash / Zsh / Fish / PowerShell 補完を生成
-make man            # man ページを生成
-make lock           # pip 用の requirements.lock / requirements-dev.lock を更新
-```
+## Python をどう探しているのか
 
-依存解決は `uv` がインストールされていれば自動的に uv を使い、
-なければ `python3 -m venv` と pip にフォールバックします。pip 経路でも
-`requirements.lock` / `requirements-dev.lock` の固定バージョンを使用します。
-明示する場合は次のように指定します。
+Go ランチャーはインストール方法で Python の探し方を分けています。
 
-```bash
-make setup PY_TOOL=uv
-make setup PY_TOOL=pip
-```
+- `make install`：インストール時に埋め込んだ専用 venv を使用
+- `make build` の開発版：リポジトリ内または作業ディレクトリの `.venv` を使用
+- `PERPETUI_PYTHON` を指定した場合：どちらでもその Python を優先
 
-ユーザー領域へのインストール:
+Unix では最終的に `exec` で Python に置き換えます。TUI の描画や取引所との通信は Python 側が担当します。
 
-```bash
-make install
-```
-
-`~/.local/bin/perpetui`、`~/.local/share/perpetui/venv`、シェル補完、man ページを配置します。
-`PREFIX` / `BINDIR` / `DATADIR` で配置先を変更できます。アンインストールは `make uninstall` です。
-
-インストール後は Go バイナリだけで起動できます。実行時に `uv` は不要です。
-`~/.local/bin` が PATH にない場合は追加してください。
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-perpetui --demo
-perpetui --exchange lighter
-perpetui --exchange hyperliquid --public
-```
-
-Python 環境の検出方法は、インストール版と開発版で分離されています。
-
-- インストール版（`make install`）: `make install` 時に埋め込んだ専用 venv のみを使用
-- 開発版（`make build` / `build/perpetui`）: リポジトリ内またはカレントディレクトリの `.venv`
-- `PERPETUI_PYTHON` を指定した場合は、どちらでもその Python を最優先
-
-インストール後に配置先を移動した場合は、埋め込まれた venv パスが変わるため
-`make install` を再実行してください。
-
-`perpetui --help`、`perpetui --version`、`perpetui completion ...`、`perpetui docs man` は
-Python を起動せず Go 側だけで完結します。
+`perpetui --help`、`perpetui --version`、`perpetui completion ...`、`perpetui docs man` は Go だけで処理するため、Python を起動しません。
 
 [README に戻る](../README.md)
