@@ -85,7 +85,7 @@ func pythonArgs(cmd *cobra.Command) []string {
 
 func registerCompletions(root *cobra.Command) {
 	flagCompletion := map[string][]string{
-		"lang":     {"en", "ja"},
+		"lang":     {"en", "ja", "ru", "zh-cn", "zh-tw"},
 		"exchange": {"hyperliquid", "hl", "lighter", "lt", "mexc"},
 		"interval": {"1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"},
 	}
