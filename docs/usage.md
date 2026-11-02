@@ -4,15 +4,18 @@ perpetui はキーボードだけでも操作できるようにしています�
 
 ## 表示言語
 
-日本語と英語に対応しています。
+日本語、英語、ロシア語、中国語（簡体字・繁体字）に対応しています。
 
 ```sh
 perpetui --lang ja
+perpetui --lang ru
+perpetui --lang zh-cn
+perpetui --lang zh-tw
 perpetui --exchange hyperliquid --lang en
 perpetui --lang ja --help
 ```
 
-`--lang` を省略すると `PERPETUI_LANG`、`LANGUAGE`、`LC_ALL`、`LC_MESSAGES`、`LANG` の順で確認します。未設定や未対応の言語は英語です。翻訳文字列は `src/perpetui/locales/ja.json` にあります。
+`--lang` を省略すると `PERPETUI_LANG`、`LANGUAGE`、`LC_ALL`、`LC_MESSAGES`、`LANG` の順で確認します。`zh_CN.UTF-8` や `zh_TW.UTF-8` のようなロケール表記も、それぞれ `zh-cn` と `zh-tw` として扱います。未設定や未対応の言語は英語です。翻訳文字列は `src/perpetui/locales/` の各 JSON ファイルにあります。
 
 ## チャートを増やす
 
