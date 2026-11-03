@@ -639,7 +639,7 @@ class TradingApp(ChartWorkspace, App[None]):
 
     @on(Select.Changed, "#position-group")
     def position_group_changed(self, event: Select.Changed) -> None:
-        if self.portfolio is not None and event.value in {"none", "exchange", "symbol"}:
+        if self.portfolio is not None and event.value in {"none", "exchange", "symbol", "exposure"}:
             self._portfolio_group = str(event.value)
             self._render_positions()
 
@@ -736,7 +736,11 @@ class TradingApp(ChartWorkspace, App[None]):
     def _update_positions_layout(self) -> None:
         self.query_one(PositionsPane).update_layout(
             self.client,
-            len(self.positions),
+            (
+                len(self.portfolio.exposures(self.positions))
+                if self.portfolio is not None and self._portfolio_group == "exposure"
+                else len(self.positions)
+            ),
             (
                 "; ".join(f"{key}: {message}" for key, message in self.portfolio.errors.items())
                 if self.portfolio is not None
