@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from perpetui.domain.models import Position
+from perpetui.i18n import _
 from perpetui.exchanges.base import DataSource
 from perpetui.services.positions import PositionsService
 
@@ -116,10 +117,10 @@ class PortfolioService:
         return result
 
     def options(self) -> list[tuple[str, str]]:
-        entries = [("All accounts", "all")]
-        entries.extend((f"Portfolio: {name}", f"portfolio:{name}") for name in self.profiles)
+        entries = [(_("All accounts"), "all")]
+        entries.extend((_("Portfolio: {name}", name=name), f"portfolio:{name}") for name in self.profiles)
         entries.extend(
-            (f"Exchange: {exchange}", f"exchange:{exchange}")
+            (_("Exchange: {exchange}", exchange=exchange), f"exchange:{exchange}")
             for exchange in sorted({a.exchange for a in self.accounts.values()})
         )
         entries.extend(
