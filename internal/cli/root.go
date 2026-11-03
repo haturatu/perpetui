@@ -41,6 +41,7 @@ func NewRootCommand() *cobra.Command {
 
 	flags := root.Flags()
 	flags.String("lang", "", "UI language (default: system locale)")
+	flags.String("config", "", "Optional account portfolio TOML (default: ~/.config/perpetui/config.toml)")
 	flags.String("exchange", "hyperliquid", "Exchange (default: hyperliquid)")
 	flags.Bool("demo", false, "Use sample data, without network access")
 	flags.Bool("demo-empty", false, "Demo with no positions (BTC chart)")
