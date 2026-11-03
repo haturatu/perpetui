@@ -85,6 +85,10 @@ async def test_same_position_id_across_accounts_and_partial_failure() -> None:
             "USDT": Decimal("-3.0"),
         }
         assert service.usd_pnl(service.positions) == Decimal("2.0")
+        assert service.margin_by_venue(service.positions) == {
+            ("hyperliquid", "USDC"): Decimal(10),
+            ("mexc", "USDT"): Decimal(10),
+        }
 
         mexc.fail = True
         await service.refresh(restart_stream=True)
