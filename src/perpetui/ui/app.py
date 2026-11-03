@@ -279,9 +279,19 @@ class TradingApp(ChartWorkspace, App[None]):
 
     def _update_timeframe(self) -> None:
         selector = self.query_one("#timeframe", Select)
+        intervals = self._intervals()
+        charts = getattr(self, "charts", None)
+        if self.portfolio is not None and charts:
+            index = min(max(self.workspace.active_chart_id - 1, 0), len(charts) - 1)
+            interval = charts[index].state.interval
+        else:
+            interval = self.interval
+        # A pane may not support every interval of the previously active venue.
+        if intervals and interval not in intervals:
+            interval = intervals[0]
         with selector.prevent(Select.Changed):
-            selector.set_options([(label, label) for label in self._intervals()])
-            selector.value = self.interval
+            selector.set_options([(label, label) for label in intervals])
+            selector.value = interval
 
     def _setup_table(self) -> None:
         pane = self.query_one(PositionsPane)
