@@ -62,6 +62,8 @@ def test_account_portfolio_configuration(tmp_path) -> None:
         '[[accounts]]\nid="bad:id"\nexchange="mexc"',
         '[[accounts]]\nid="a"\nexchange="mexc"\nwallet_address="0x123"',
         '[[accounts]]\nid="a"\nexchange="mexc"\ntestnet=true',
+        '[[accounts]]\nid="a"\nexchange="mexc"\nenabled=false\n'
+        '[[portfolios]]\nid="p"\naccounts=["a"]',
     ],
 )
 def test_bad_accounts_fail_before_connecting(tmp_path, fragment) -> None:

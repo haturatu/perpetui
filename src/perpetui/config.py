@@ -50,22 +50,24 @@ def load_config(path: Path) -> PortfolioConfig | None:
     if not isinstance(data, dict):
         raise ValueError("Invalid perpetui config")
     accounts = []
-    seen = set()
+    declared = set()
+    enabled_ids = set()
     for item in data.get("accounts", []):
         if not isinstance(item, dict):
             raise ValueError("Each account must be a TOML table")
         identifier, exchange = item.get("id"), item.get("exchange")
         if not isinstance(identifier, str) or not IDENTIFIER.fullmatch(identifier):
             raise ValueError("Account id must contain 1-64 letters, digits, _ or -")
-        if identifier in seen:
+        if identifier in declared:
             raise ValueError(f"Duplicate account id: {identifier}")
-        seen.add(identifier)
+        declared.add(identifier)
         if exchange not in EXCHANGES:
             raise ValueError(f"Unsupported exchange for {identifier}")
         if not isinstance(item.get("enabled", True), bool):
             raise ValueError(f"Invalid enabled value for {identifier}")
         if not item.get("enabled", True):
             continue
+        enabled_ids.add(identifier)
         account = item.get("account")
         address = item.get("wallet_address")
         index = item.get("lighter_account_index")
@@ -97,8 +99,8 @@ def load_config(path: Path) -> PortfolioConfig | None:
         name, ids = profile.get("id"), profile.get("accounts")
         if not isinstance(name, str) or not IDENTIFIER.fullmatch(name) or name in profiles:
             raise ValueError("Invalid or duplicate portfolio id")
-        if not isinstance(ids, list) or not ids or any(i not in seen for i in ids):
-            raise ValueError(f"Portfolio {name} references unknown accounts")
+        if not isinstance(ids, list) or not ids or any(i not in enabled_ids for i in ids):
+            raise ValueError(f"Portfolio {name} references unknown or disabled accounts")
         profiles[name] = tuple(ids)
 
     settings = data.get("portfolio", {})
