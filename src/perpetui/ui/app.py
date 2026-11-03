@@ -159,8 +159,10 @@ class TradingApp(ChartWorkspace, App[None]):
 
     def _intervals(self) -> tuple[str, ...]:
         client = self.client
-        if getattr(self, "portfolio", None) is not None and self.is_mounted:
-            client = self._active_frame().session.hub.client
+        charts = getattr(self, "charts", None)
+        if getattr(self, "portfolio", None) is not None and charts:
+            index = min(max(self.workspace.active_chart_id - 1, 0), len(charts) - 1)
+            client = charts[index].hub.client
         return tuple(getattr(client, "intervals", tuple(INTERVAL_SECONDS)))
 
     @property
