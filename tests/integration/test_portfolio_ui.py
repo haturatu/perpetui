@@ -1,6 +1,6 @@
 """End-to-end account filtering, exposure view and per-pane exchange routing."""
 
-from textual.widgets import DataTable, Select
+from textual.widgets import DataTable, Select, Static
 
 from perpetui.config import PortfolioConfig
 from perpetui.exchanges.demo import DemoClient
@@ -30,6 +30,9 @@ async def test_multi_account_filters_risk_and_independent_chart_venues():
         await settle(app, pilot)
         assert len(app.positions) == 6
         assert app.query_one("#positions", DataTable).row_count == 6
+        brand = app.query_one("#brand", Static)
+        assert str(brand.render()) == "◈  PORTFOLIO  /  TERMINAL"
+        assert app.title == "perpetui Portfolio"
 
         app.query_one("#position-scope", Select).value = "account:mexc"
         await settle(app, pilot)
@@ -48,6 +51,9 @@ async def test_multi_account_filters_risk_and_independent_chart_venues():
         app.query_one("#exchange", Select).value = "mexc"
         await settle(app, pilot)
         assert app.charts[0].hub.client.exchange.lower() == "mexc"
+        # The combined view keeps its portfolio brand regardless of the active chart.
+        assert str(brand.render()) == "◈  PORTFOLIO  /  TERMINAL"
+        assert app.title == "perpetui Portfolio"
 
         app.action_chart_count(2)
         await settle(app, pilot)
