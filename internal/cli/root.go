@@ -41,8 +41,10 @@ func NewRootCommand() *cobra.Command {
 
 	flags := root.Flags()
 	flags.String("lang", "", "UI language (default: system locale)")
+	flags.String("config", "", "Optional account portfolio TOML (default: ~/.config/perpetui/config.toml)")
 	flags.String("exchange", "hyperliquid", "Exchange (default: hyperliquid)")
-	flags.Bool("demo", false, "Use sample data, without network access")
+	flags.String("demo", "", "Use sample data; optional mode: single or portfolio")
+	flags.Lookup("demo").NoOptDefVal = "single"
 	flags.Bool("demo-empty", false, "Demo with no positions (BTC chart)")
 	flags.Bool("public", false, "Market data only; skip account lookup")
 	flags.String("symbol", "", "Initial symbol, e.g. BTC, ETH_USDT or xyz:CL")
@@ -86,6 +88,7 @@ func pythonArgs(cmd *cobra.Command) []string {
 func registerCompletions(root *cobra.Command) {
 	flagCompletion := map[string][]string{
 		"lang":     {"en", "ja", "ru", "zh-cn", "zh-tw"},
+		"demo":     {"single", "portfolio"},
 		"exchange": {"hyperliquid", "hl", "lighter", "lt", "mexc"},
 		"interval": {"1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"},
 	}

@@ -103,16 +103,32 @@ class ChartWorkspace(MessagePump):
             self.workspace.layout_busy = False
 
     def _default_chart_symbol(self, index: int) -> str:
-        candidates = list(dict.fromkeys([p.symbol for p in self.positions]))
+        client = (
+            self._active_frame().session.hub.client if self.portfolio is not None else self.client
+        )
+        candidates = list(
+            dict.fromkeys(
+                p.symbol
+                for p in self.positions
+                if self.portfolio is None or p.account.exchange == client.exchange.lower()
+            )
+        )
         known = self.query_one(SymbolSearch).symbols
         for coin in ("BTC", "ETH", "SOL"):
-            symbol = self.client.normalize_symbol(coin)
+            symbol = client.normalize_symbol(coin)
             if symbol in known and symbol not in candidates:
                 candidates.append(symbol)
-        return candidates[index - 1] if len(candidates) >= index else self.symbol
+        return (
+            candidates[index - 1]
+            if len(candidates) >= index
+            else client.default_symbol
+            if self.portfolio is not None
+            else self.symbol
+        )
 
     def _new_chart_session(self, index: int, symbol: str, interval: str) -> ChartSession:
-        session = ChartSession(self.feed_hub, index, symbol, interval)
+        hub = self._active_frame().session.hub if self.portfolio is not None else self.feed_hub
+        session = ChartSession(hub, index, symbol, interval)
         self.charts.append(session)
         return session
 
@@ -145,7 +161,11 @@ class ChartWorkspace(MessagePump):
                         entry=self._entry_for(symbol),
                         detail=detail,
                         zoom=zoom,
-                        autoload=self._initial_selection or not self.client.authenticated,
+                        autoload=(
+                            self.portfolio is not None
+                            or self._initial_selection
+                            or not self.client.authenticated
+                        ),
                     )
                 )
         self._apply_maximized_layout()
@@ -163,7 +183,18 @@ class ChartWorkspace(MessagePump):
             frame.set_class(frame is panel if panel else frame.id == "chart-pane", "active")
         selector = self.query_one("#timeframe", Select)
         with selector.prevent(Select.Changed):
-            selector.value = panel.interval if panel else self.interval
+            if self.portfolio is None:
+                selector.value = panel.interval if panel else self.interval
+        if self.portfolio is not None:
+            exchange = self._active_frame().session.hub.client.exchange.lower()
+            exchange_selector = self.query_one("#exchange", Select)
+            previous_exchange = exchange_selector.value
+            with exchange_selector.prevent(Select.Changed):
+                exchange_selector.value = exchange
+            if previous_exchange != exchange:
+                self.query_one(SymbolSearch).reset()
+                self.load_symbols()
+            self._update_timeframe()
         market = panel.market if panel else self.market
         if market:
             self._render_market(market, force=True)
@@ -257,7 +288,7 @@ class ChartWorkspace(MessagePump):
         with selector.prevent(Select.Changed):
             selector.value = interval
         for panel in self.query(ChartPanel):
-            if panel.interval != interval:
+            if interval in panel.session.hub.client.intervals and panel.interval != interval:
                 panel.change(interval=interval)
         self._status()
 
@@ -342,7 +373,7 @@ class ChartWorkspace(MessagePump):
         self._apply_adaptive_layout()
 
     def action_toggle_positions(self) -> None:
-        if not self.client.authenticated or self._switching:
+        if (not self.client.authenticated and self.portfolio is None) or self._switching:
             return
         self.workspace.positions_override = not self.query_one("#positions-pane").display
         self._update_positions_layout()

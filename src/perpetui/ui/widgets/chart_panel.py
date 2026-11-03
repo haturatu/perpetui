@@ -148,8 +148,13 @@ class ChartPanel(ChartFrame):
         zoom_label = f" · {_('PRICE')} ×{zoom}" if zoom > 1 else ""
         detail = _("FINE") if chart.detail else _("SOLID")
         prefix = f"{self.index} · " if self.numbered else ""
+        exchange = (
+            f"{self.session.hub.client.exchange.upper()} · "
+            if getattr(self.app, "portfolio", None) is not None
+            else ""
+        )
         self.border_title = (
-            f" {prefix}{self.symbol.replace('_', ' / ')} · {self.interval} · "
+            f" {prefix}{exchange}{self.symbol.replace('_', ' / ')} · {self.interval} · "
             f"{_('PERPETUAL')} · {detail}{zoom_label} · {chart.mode_label()} "
         )
 

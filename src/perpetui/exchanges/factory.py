@@ -21,7 +21,7 @@ class ClientOptions(Protocol):
     exchange: str
     account: str | None
     websocket_url: str | None
-    demo: bool
+    demo: str | None
     demo_empty: bool
     public: bool
     hl_command: str | None

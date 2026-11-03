@@ -1,6 +1,7 @@
 import pytest
 
 from perpetui.cli import main
+from perpetui.exchanges.demo import DemoClient
 from perpetui.logging_config import configure_logging
 
 
@@ -42,6 +43,40 @@ def test_tui_fatal_exit_code_reaches_the_shell(monkeypatch):
     monkeypatch.setattr("perpetui.cli.TradingApp", FatalApp)
     assert main(["--demo"]) == 1
     configure_logging().handlers.clear()
+
+
+def test_demo_portfolio_mode_provides_builtin_multi_exchange_accounts(monkeypatch):
+    captured = {}
+
+    class FakeApp:
+        return_code = 0
+
+        def __init__(self, client, **kwargs):
+            captured.update(client=client, **kwargs)
+
+        def run(self):
+            pass
+
+    monkeypatch.setattr("perpetui.cli.TradingApp", FakeApp)
+    assert main(["--demo=portfolio", "--lang", "en"]) == 0
+    config = captured["portfolio_config"]
+    assert [account.id for account in config.accounts] == [
+        "hl-main",
+        "hl-hedge",
+        "mexc-trading",
+        "lt-main",
+    ]
+    assert config.default_view == "all"
+    assert config.group_by == "exchange"
+    assert set(config.profiles) == {"hedge", "all-venues"}
+    sources = dict(captured["portfolio_sources"])
+    assert {ref.id: client.exchange for ref, client in sources.items()} == {
+        "hl-main": "Hyperliquid",
+        "hl-hedge": "Hyperliquid",
+        "mexc-trading": "MEXC",
+        "lt-main": "Lighter",
+    }
+    assert all(isinstance(client, DemoClient) for client in sources.values())
 
 
 @pytest.mark.parametrize("value", ["0", "-1", "nan", "inf"])
