@@ -1,0 +1,31 @@
+name: Temporary portfolio branch formatter
+on:
+  push:
+    branches:
+      - feat/unified-multi-exchange-portfolio-20261103
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/unified-multi-exchange-portfolio-20261103
+          persist-credentials: true
+      - uses: astral-sh/setup-uv@v7
+      - name: Apply ruff fixes and formatter
+        run: |
+          uvx ruff check --fix src/perpetui/config.py src/perpetui/services/portfolio.py src/perpetui/cli.py src/perpetui/ui/app.py src/perpetui/ui/workspace.py src/perpetui/ui/widgets/chart_panel.py src/perpetui/ui/widgets/positions.py src/perpetui/ui/state.py tests/test_portfolio.py tests/test_portfolio_config.py tests/integration/test_portfolio_ui.py || true
+          uvx ruff format src/perpetui/config.py src/perpetui/services/portfolio.py src/perpetui/cli.py src/perpetui/ui/app.py src/perpetui/ui/workspace.py src/perpetui/ui/widgets/chart_panel.py src/perpetui/ui/widgets/positions.py src/perpetui/ui/state.py tests/test_portfolio.py tests/test_portfolio_config.py tests/integration/test_portfolio_ui.py
+      - name: Commit formatting to feature branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/perpetui tests/test_portfolio.py tests/test_portfolio_config.py tests/integration/test_portfolio_ui.py
+          if ! git diff --cached --quiet; then
+            git commit -m "style: apply Ruff formatting to portfolio implementation"
+            git push origin HEAD:feat/unified-multi-exchange-portfolio-20261103
+          fi
