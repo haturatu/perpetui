@@ -1,28 +1,30 @@
-# インストールと起動
+# Installation and startup
 
-perpetui は TUI の本体が Python、起動用のコマンドが Go という構成です。
+**English** | [日本語](installation.ja.md)
 
-少し回りくどく見えるかもしれませんが、普段は `perpetui` という一つのコマンドで使えます。Go ランチャーが Python 環境を探して、Textual の画面を起動する仕組みです。
+perpetui uses Python for the TUI and Go for the launcher.
 
-## 必要なもの
+This may look like an unusual combination, but you normally only need the `perpetui` command. The Go launcher locates the Python environment and starts the Textual application.
 
-| 項目 | 用途 |
+## Requirements
+
+| Component | Purpose |
 | --- | --- |
-| Python 3.11 以上 | TUI 本体 |
-| Go 1.23 以上 | Go ランチャーのビルド。インストール済みバイナリの実行には不要 |
-| make | セットアップとインストール |
-| ANSI / UTF-8 対応の端末 | チャートと画面の表示 |
-| uv | Python 依存関係の取得。未導入なら venv + pip を使用 |
-| pip 25.1 以上 | pip を使用する場合 |
-| git | ソースコードの取得 |
+| Python 3.11 or later | TUI application |
+| Go 1.23 or later | Build the Go launcher; not required to run an installed binary |
+| make | Setup and installation |
+| ANSI/UTF-8-capable terminal | Display charts and the UI |
+| uv | Resolve Python dependencies; venv + pip is used if uv is unavailable |
+| pip 25.1 or later | Required if using pip |
+| git | Fetch the source code |
 
-120 列 × 40 行以上の端末を推奨しています。小さな端末でも動作しますが、複数チャートは表示領域が足りなくなります。
+A terminal of at least 120 columns × 40 rows is recommended. Smaller terminals work, but there may not be enough space for multiple charts.
 
-取引所のアカウント設定は必須ではありません。相場を見るだけなら認証せずに使えます。
+Exchange accounts are optional. You can view public market data without authentication.
 
-## 普段使う環境にインストールする
+## Install for regular use
 
-一番簡単なのは `make install` です。
+The simplest option is `make install`:
 
 ```sh
 git clone https://github.com/haturatu/perpetui.git
@@ -30,43 +32,43 @@ cd perpetui
 make install
 ```
 
-既定では次の場所にインストールします。
+By default, files are installed in these locations:
 
-| 配置先 | 内容 |
+| Location | Contents |
 | --- | --- |
-| `~/.local/bin/perpetui` | Go ランチャー |
-| `~/.local/share/perpetui/venv` | アプリ専用の Python 環境 |
-| `~/.local/share/bash-completion/completions/perpetui` など | シェル補完 |
-| `~/.local/share/man/man1/` | man ページ |
+| `~/.local/bin/perpetui` | Go launcher |
+| `~/.local/share/perpetui/venv` | Dedicated Python environment |
+| `~/.local/share/bash-completion/completions/perpetui`, etc. | Shell completions |
+| `~/.local/share/man/man1/` | Man page |
 
-`~/.local/bin` に PATH が通っていなければ追加してください。
+Add `~/.local/bin` to your `PATH` if necessary:
 
 ```sh
 export PATH="$HOME/.local/bin:$PATH"
 perpetui --demo
 ```
 
-`PREFIX`、`BINDIR`、`DATADIR` を指定すると配置先を変更できます。アンインストールには `make uninstall` を使います。
+Set `PREFIX`, `BINDIR`, or `DATADIR` to change the installation locations. Use `make uninstall` to uninstall.
 
 ```sh
 make install PREFIX="$HOME/.local"
 make uninstall
 ```
 
-インストールした後は `uv` の実行や Go のビルドは不要です。ただし、**インストール時に作成した専用の Python 環境は必要**です。バイナリだけを別の場所へ移した場合は、`make install` で入れ直してください。
+After installation, neither uv nor the Go toolchain is required at runtime. However, **the dedicated Python environment created during installation is still required**. If you move only the binary, reinstall with `make install`.
 
-## インストールせずに開発環境から使う
+## Run from a development checkout
 
-開発中ならローカルに `.venv` を作る方が扱いやすいです。
+During development, it is convenient to use a local `.venv`:
 
 ```sh
 make setup
 make run
 ```
 
-`make setup` は uv が見つかれば `uv sync --locked --dev` を使います。なければ venv と pip でセットアップします。
+When uv is available, `make setup` runs `uv sync --locked --dev`. Otherwise it sets up venv with pip.
 
-uv を使う場合は、次のように直接起動できます。
+With uv, you can start the application directly:
 
 ```sh
 uv sync --dev
@@ -74,7 +76,7 @@ uv run perpetui --demo
 uv run perpetui
 ```
 
-pip を使う場合も対応しています。
+The pip path is supported too:
 
 ```sh
 python3 -m venv .venv
@@ -82,25 +84,25 @@ python3 -m venv .venv
 .venv/bin/perpetui --demo
 ```
 
-どちらを使うか明示したい場合は `make setup PY_TOOL=uv` または `make setup PY_TOOL=pip` とします。pip 経路でも `requirements.lock` と `requirements-dev.lock` の固定バージョンを使います。
+To select the dependency manager explicitly, use `make setup PY_TOOL=uv` or `make setup PY_TOOL=pip`. The pip path also uses the pinned versions in `requirements.lock` and `requirements-dev.lock`.
 
-### Makefile でできること
+### Makefile targets
 
 ```sh
-make setup         # Python 環境の準備
-make build         # Go ランチャーを build/perpetui にビルド
-make run           # ビルドして起動
-make demo          # サンプルデータで起動
-make test          # Python / Go のテスト
-make lint          # Ruff / go vet / gofmt の検査
-make completions   # Bash / Zsh / Fish / PowerShell の補完を生成
-make man           # man ページを生成
-make lock          # pip 用ロックファイルを更新
+make setup         # Prepare the Python environment
+make build         # Build the Go launcher to build/perpetui
+make run           # Build and start the application
+make demo          # Start with sample data
+make test          # Run Python / Go tests
+make lint          # Run Ruff / go vet / gofmt checks
+make completions   # Generate Bash / Zsh / Fish / PowerShell completions
+make man           # Generate the man page
+make lock          # Update pip lockfiles
 ```
 
-`make run` は実行のたびに `build` を呼び出します。ビルド済みのインストール版を使うだけなら、`perpetui` を直接実行した方が簡単です。
+`make run` calls the build target each time. If you only want to run an installed copy, invoking `perpetui` directly is simpler.
 
-## アカウントなしでも使える
+## Use it without an account
 
 ```sh
 perpetui --demo-empty
@@ -111,22 +113,22 @@ perpetui --account main
 perpetui --no-websocket
 ```
 
-`--demo-empty` はポジションなしのサンプル画面、`--demo=portfolio` は複数取引所の統合ポートフォリオのサンプル画面、`--public` は認証設定を使わず公開相場だけを表示します。`--no-websocket` では WebSocket を使わず REST で定期的に取得します。
+`--demo-empty` shows sample charts without positions; `--demo=portfolio` shows a combined multi-exchange sample portfolio. `--public` uses only public market data and ignores account credentials. `--no-websocket` switches to periodic REST polling.
 
-アカウントが設定されていなければポジション欄を使わず、画面の領域をチャートに回します。ポジションが 0 件の場合も一覧を折りたたみます。
+If no account is configured, the positions panel does not take up space, leaving more room for charts. The list also collapses when the position count is zero.
 
-Hyperliquid はウォレットアドレス、Lighter はアカウント番号があれば秘密鍵なしで監視できます。MEXC のポジション監視には API 認証が必要です。詳細は[取引所の設定](exchanges.md)を参照してください。
+You can monitor Hyperliquid by wallet address and Lighter by account index without a private key. MEXC position monitoring requires API authentication. See [exchange configuration](exchanges.md) for details.
 
-## Python をどう探しているのか
+## How the launcher finds Python
 
-Go ランチャーはインストール方法で Python の探し方を分けています。
+The Go launcher selects a Python environment according to the installation type:
 
-- `make install`：インストール時に埋め込んだ専用 venv を使用
-- `make build` の開発版：リポジトリ内または作業ディレクトリの `.venv` を使用
-- `PERPETUI_PYTHON` を指定した場合：どちらでもその Python を優先
+- `make install`: use the dedicated venv embedded into the installed launcher's configuration.
+- Development build from `make build`: use `.venv` in the repository or working directory.
+- If `PERPETUI_PYTHON` is set: use that Python interpreter in either case.
 
-Unix では最終的に `exec` で Python に置き換えます。TUI の描画や取引所との通信は Python 側が担当します。
+On Unix, the launcher ultimately replaces itself with Python via `exec`. Python handles all TUI rendering and exchange communication.
 
-`perpetui --help`、`perpetui --version`、`perpetui completion ...`、`perpetui docs man` は Go だけで処理するため、Python を起動しません。
+`perpetui --help`, `perpetui --version`, `perpetui completion ...`, and `perpetui docs man` are handled entirely by Go without launching Python.
 
-[README に戻る](../README.md)
+[Back to README](../README.md)

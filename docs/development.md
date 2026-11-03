@@ -1,19 +1,21 @@
-# 開発
+# Development
 
-perpetui は Python と Go の両方を使っていますが、チャートの描画や取引所との通信は Python 側です。Go は CLI の入口と Python の起動を担当しています。
+**English** | [日本語](development.ja.md)
 
-なぜ分けているかというと、普段の起動やシェル補完、man ページの生成は Go でまとめつつ、TUI 本体は Textual の仕組みを使いたかったためです。
+perpetui uses both Python and Go. Chart rendering and exchange communication run in Python, while Go provides the command-line entry point and launches Python.
 
-## テストと整形
+The separation lets Go handle startup, shell completions, and man-page generation, while Textual powers the TUI.
 
-リポジトリのルートで、次のコマンドを実行します。
+## Tests and formatting
+
+Run the following from the repository root:
 
 ```sh
 make setup
 make check
 ```
 
-`make check` は Python の Ruff とテスト、Go の `go vet`・`gofmt`・テストを実行します。個別に動かす場合は以下です。
+`make check` runs Python's Ruff checks and tests, and Go's `go vet`, `gofmt` checks, and tests. You can also run individual tasks:
 
 ```sh
 uv run pytest
@@ -22,43 +24,43 @@ uv run ruff format --check .
 uv build
 ```
 
-`make test`、`make lint`、`make build`、`make demo` なども用意しています。使い方は[インストール](installation.md)を参照してください。
+Other targets include `make test`, `make lint`, `make build`, and `make demo`. See [installation](installation.md).
 
-### ログ
+### Logging
 
-DEBUG / INFO は標準出力、WARN / ERROR は標準エラーへ出力します。起動できない場合は標準エラーへ理由を出し、終了コード 1 で終了します。
+DEBUG and INFO messages go to standard output; WARN and ERROR messages go to standard error. Startup errors are reported on standard error and the process exits with status 1.
 
-API キー、署名、レスポンス本文はログに出さない設計です。Issue を作る際も、認証情報をそのまま貼り付けないでください。
+API keys, signatures, and response bodies are intentionally omitted from logs. Do not include credentials when opening an issue.
 
-## チャートの描画
+## Chart rendering
 
-チャートには [Plotext 6](https://github.com/piccolomo/plotext) を使用しています。ANSI の描画結果を Rich Text に変換し、Textual のウィジェットへ表示します。
+Charts use [Plotext 6](https://github.com/piccolomo/plotext). Its ANSI rendering output is converted to Rich Text and displayed inside Textual widgets.
 
-ローソク足の実体は矩形、ヒゲは線分です。FINE モードでは点字マーカーを使用し、1 文字の横 2 × 縦 4 の領域を使って実体・ヒゲ・出来高を描画します。
+Candle bodies are rectangles and wicks are line segments. FINE mode uses Braille markers, giving each character a 2 × 4 subcell grid for bodies, wicks, and volume.
 
-描画領域に合わせて直近の足を選び、データ、建値、端末サイズが変わったときに再描画します。端末フォントによって点の見え方は変わります。
+The application selects recent candles based on the available space and rerenders when data, entry prices, or terminal dimensions change. How individual dots look depends on the terminal font.
 
-MEXC の API は [MEXC Futures API](https://www.mexc.com/api-docs/futures/integration-guide) を使用しています。[接続ドメインの更新案内](https://www.mexc.com/announcements/article/futures-api-access-domain-update-17827791532974)に合わせ、REST の既定は `https://api.mexc.com` です。`MEXC_FUTURES_BASE_URL`、`MEXC_BASE_URL`、`--futures-base-url` で変更できます。
+The MEXC adapter uses the [MEXC Futures API](https://www.mexc.com/api-docs/futures/integration-guide). Following the [API domain update notice](https://www.mexc.com/announcements/article/futures-api-access-domain-update-17827791532974), the default REST endpoint is `https://api.mexc.com`. You can override it with `MEXC_FUTURES_BASE_URL`, `MEXC_BASE_URL`, or `--futures-base-url`.
 
-アプリは読み取り専用です。注文、決済、アカウント変更の処理は実装していません。
+The application is read-only: there is no implementation for placing orders, closing positions, or changing accounts.
 
-## Go と Python のバージョン
+## Go and Python versions
 
-Python 側のバージョンはインストールしたパッケージのメタデータから取得します。一方、Go のバージョン表示には `pyproject.toml` の値を生成して埋め込んでいます。
+The Python version is obtained from installed package metadata. The Go version string is generated from `pyproject.toml` and embedded in the binary.
 
-`make build-go` と `make build-install` は事前に同期処理を実行しますが、`go build` を直接呼ぶ場合は自分で同期してください。
+`make build-go` and `make build-install` synchronize versions automatically. If you call `go build` directly, run the synchronization yourself:
 
 ```sh
 python3 scripts/sync_version.py
 go build ./cmd/perpetui
 ```
 
-Go と Python の CLI オプションについては、名前・既定値・選択肢・英語ヘルプが一致しているかテストで確認しています。
+Tests check that Go and Python command-line options match in name, default, choices, and English help text.
 
-依存関係は uv と pip の両方を扱うため、`uv.lock`、`requirements.lock`、`requirements-dev.lock` を維持しています。ロックファイル更新には `make lock` を使えます。
+Because both uv and pip are supported, the repository maintains `uv.lock`, `requirements.lock`, and `requirements-dev.lock`. Use `make lock` to update the pip lockfiles.
 
-## 内部構成
+## Internal structure
 
-各モジュールの責務と依存方向、共有 WebSocket や複数チャートの状態管理については[アーキテクチャ](architecture.md)を参照してください。
+For module responsibilities, dependency direction, shared WebSocket handling, and multi-chart state management, see [architecture](architecture.md).
 
-[README に戻る](../README.md)
+[Back to README](../README.md)
