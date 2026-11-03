@@ -146,5 +146,22 @@
   "Time zoom in": "放大时间轴",
   "Maximize": "最大化",
   "Positions": "持仓",
-  "Commands": "命令"
+  "Commands": "命令",
+  "All accounts": "所有账户",
+  "Original": "默认",
+  "Exposure": "敞口",
+  "Source": "来源",
+  "Qty": "数量",
+  "Asset": "资产",
+  "Long": "多头",
+  "Short": "空头",
+  "Net": "净敞口",
+  "Gross": "总敞口",
+  "Long %": "多头占比",
+  "No open positions in selected accounts": "所选账户没有持仓",
+  "No comparable linear contract positions": "没有可比较的线性合约持仓",
+  "Portfolio: {name}": "组合: {name}",
+  "Exchange: {exchange}": "交易所: {exchange}",
+  "{exchange} margin {margin} {currency}": "{exchange} 保证金 {margin} {currency}",
+  "Optional account portfolio TOML (default: ~/.config/perpetui/config.toml)": "可选的多账户组合 TOML（默认 ~/.config/perpetui/config.toml）"
 }
