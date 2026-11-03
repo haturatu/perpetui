@@ -18,7 +18,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - name: Apply ruff fixes and formatter
         run: |
-          uvx ruff check --fix src/perpetui/config.py src/perpetui/services/portfolio.py src/perpetui/cli.py src/perpetui/ui/app.py src/perpetui/ui/workspace.py src/perpetui/ui/widgets/chart_panel.py src/perpetui/ui/widgets/positions.py src/perpetui/ui/state.py tests/test_portfolio.py tests/test_portfolio_config.py
+          uvx ruff check --fix src/perpetui/config.py src/perpetui/services/portfolio.py src/perpetui/cli.py src/perpetui/ui/app.py src/perpetui/ui/workspace.py src/perpetui/ui/widgets/chart_panel.py src/perpetui/ui/widgets/positions.py src/perpetui/ui/state.py tests/test_portfolio.py tests/test_portfolio_config.py || true
           uvx ruff format src/perpetui/config.py src/perpetui/services/portfolio.py src/perpetui/cli.py src/perpetui/ui/app.py src/perpetui/ui/workspace.py src/perpetui/ui/widgets/chart_panel.py src/perpetui/ui/widgets/positions.py src/perpetui/ui/state.py tests/test_portfolio.py tests/test_portfolio_config.py
       - name: Commit formatting to feature branch
         run: |
