@@ -77,12 +77,18 @@ def load_config(path: Path) -> PortfolioConfig | None:
             raise ValueError(f"Invalid account alias for {identifier}")
         if address is not None and (exchange != "hyperliquid" or not isinstance(address, str)):
             raise ValueError(f"wallet_address requires Hyperliquid: {identifier}")
-        if index is not None and (exchange != "lighter" or isinstance(index, bool) or
-                                  not isinstance(index, int) or not 0 <= index < 2**63):
+        if index is not None and (
+            exchange != "lighter"
+            or isinstance(index, bool)
+            or not isinstance(index, int)
+            or not 0 <= index < 2**63
+        ):
             raise ValueError(f"lighter_account_index requires Lighter: {identifier}")
         if exchange == "mexc" and network:
             raise ValueError(f"MEXC testnet is unsupported: {identifier}")
-        accounts.append(AccountConfig(identifier, exchange, account, address, index, network, label))
+        accounts.append(
+            AccountConfig(identifier, exchange, account, address, index, network, label)
+        )
 
     profiles: dict[str, tuple[str, ...]] = {}
     for profile in data.get("portfolios", []):

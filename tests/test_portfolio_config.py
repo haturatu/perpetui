@@ -15,7 +15,8 @@ def test_missing_configuration_preserves_legacy_mode(tmp_path) -> None:
 
 def test_account_portfolio_configuration(tmp_path) -> None:
     path = tmp_path / "config.toml"
-    path.write_text(textwrap.dedent("""
+    path.write_text(
+        textwrap.dedent("""
         [portfolio]
         default_view = "portfolio:hedge"
         group_by = "symbol"
@@ -42,7 +43,8 @@ def test_account_portfolio_configuration(tmp_path) -> None:
         [[portfolios]]
         id = "hedge"
         accounts = ["hl-main", "mexc"]
-    """))
+    """)
+    )
     config = load_config(path)
     assert config is not None
     assert [item.id for item in config.accounts] == ["hl-main", "mexc"]
@@ -52,13 +54,16 @@ def test_account_portfolio_configuration(tmp_path) -> None:
     assert config.profiles["hedge"] == ("hl-main", "mexc")
 
 
-@pytest.mark.parametrize("fragment", [
-    '[[accounts]]\nid="a"\nexchange="mexc"\n[[accounts]]\nid="a"\nexchange="mexc"',
-    '[[accounts]]\nid="a"\nexchange="unknown"',
-    '[[accounts]]\nid="bad:id"\nexchange="mexc"',
-    '[[accounts]]\nid="a"\nexchange="mexc"\nwallet_address="0x123"',
-    '[[accounts]]\nid="a"\nexchange="mexc"\ntestnet=true',
-])
+@pytest.mark.parametrize(
+    "fragment",
+    [
+        '[[accounts]]\nid="a"\nexchange="mexc"\n[[accounts]]\nid="a"\nexchange="mexc"',
+        '[[accounts]]\nid="a"\nexchange="unknown"',
+        '[[accounts]]\nid="bad:id"\nexchange="mexc"',
+        '[[accounts]]\nid="a"\nexchange="mexc"\nwallet_address="0x123"',
+        '[[accounts]]\nid="a"\nexchange="mexc"\ntestnet=true',
+    ],
+)
 def test_bad_accounts_fail_before_connecting(tmp_path, fragment) -> None:
     path = tmp_path / "bad.toml"
     path.write_text(fragment)

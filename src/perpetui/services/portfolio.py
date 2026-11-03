@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Callable
 
 from perpetui.domain.models import Position
 from perpetui.exchanges.base import DataSource
@@ -51,9 +51,7 @@ class Exposure:
 
 def instrument_key(position: Position) -> str | None:
     """Only normalize well-known linear contracts; never collapse HIP-3 or multipliers."""
-    if position.contract_size is None or position.settlement.upper() not in {
-        "USD", "USDC", "USDT"
-    }:
+    if position.contract_size is None or position.settlement.upper() not in {"USD", "USDC", "USDT"}:
         return None
     symbol = position.symbol.upper()
     if ":" in symbol:
@@ -125,8 +123,7 @@ class PortfolioService:
             for exchange in sorted({a.exchange for a in self.accounts.values()})
         )
         entries.extend(
-            (f"{a.exchange} / {a.label or a.id}", f"account:{a.id}")
-            for a in self.accounts.values()
+            (f"{a.exchange} / {a.label or a.id}", f"account:{a.id}") for a in self.accounts.values()
         )
         return entries
 
@@ -142,8 +139,14 @@ class PortfolioService:
         if group_by == "exchange":
             return sorted(items, key=lambda p: (p.account.exchange, p.account.id, p.symbol))
         if group_by == "symbol":
-            return sorted(items, key=lambda p: (instrument_key(p.position) or p.symbol,
-                                               p.account.exchange, p.account.id))
+            return sorted(
+                items,
+                key=lambda p: (
+                    instrument_key(p.position) or p.symbol,
+                    p.account.exchange,
+                    p.account.id,
+                ),
+            )
         return items
 
     @staticmethod
@@ -186,7 +189,8 @@ class PortfolioService:
         if self.closed:
             return
         active = [
-            service for service in self.services.values()
+            service
+            for service in self.services.values()
             if not service.busy and (restart_stream or service.connection != "live")
         ]
         results = await asyncio.gather(

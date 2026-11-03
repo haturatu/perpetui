@@ -23,12 +23,18 @@ class PositionsPane(Vertical):
     def compose(self) -> ComposeResult:
         with Horizontal(id="portfolio-filters"):
             yield Select(
-                [("All accounts", "all")], value="all", allow_blank=False,
-                compact=True, id="position-scope",
+                [("All accounts", "all")],
+                value="all",
+                allow_blank=False,
+                compact=True,
+                id="position-scope",
             )
             yield Select(
                 [("Original", "none"), ("Exchange", "exchange"), ("Symbol", "symbol")],
-                value="none", allow_blank=False, compact=True, id="position-group",
+                value="none",
+                allow_blank=False,
+                compact=True,
+                id="position-group",
             )
         yield Static("", id="positions-summary")
         yield DataTable(id="positions", cursor_type="row", zebra_stripes=True)
@@ -70,8 +76,13 @@ class PositionsPane(Vertical):
         )
 
     def render_positions(
-        self, positions: list[Position | PortfolioPosition], selected_id: str | None,
-        client: DataSource, error: str, *, portfolio: PortfolioService | None = None,
+        self,
+        positions: list[Position | PortfolioPosition],
+        selected_id: str | None,
+        client: DataSource,
+        error: str,
+        *,
+        portfolio: PortfolioService | None = None,
     ) -> str | None:
         table = self.query_one(DataTable)
         previous_id = selected_id
@@ -86,10 +97,16 @@ class PositionsPane(Vertical):
                 if portfolio is not None:
                     quantity += " ctr" if p.account.exchange == "mexc" else " base"
                 cells = (
-                    *((Text(
-                        f"{p.account.exchange} / {p.account.label or p.account.id}",
-                        style=MUTED,
-                    ),) if portfolio is not None else ()),
+                    *(
+                        (
+                            Text(
+                                f"{p.account.exchange} / {p.account.label or p.account.id}",
+                                style=MUTED,
+                            ),
+                        )
+                        if portfolio is not None
+                        else ()
+                    ),
                     Text(p.symbol.replace("_", "/"), style=ACCENT),
                     Text(_(p.side), style=UP if p.side == "LONG" else DOWN),
                     quantity,
@@ -176,13 +193,10 @@ class PositionsPane(Vertical):
             override if override is not None else bool(count or error or not initial_selection)
         )
         extra = 3 if portfolio_enabled else 0
-        max_height = min(15 if portfolio_enabled else 12,
-                         max(5 + extra, terminal_height // 4))
+        max_height = min(15 if portfolio_enabled else 12, max(5 + extra, terminal_height // 4))
         # A horizontal scrollbar also consumes a table row on narrow terminals.
         scrollbar_height = table.scrollbar_size_horizontal if count else 0
-        pane.styles.height = min(
-            (count + 4 + scrollbar_height if count else 4) + extra, max_height
-        )
+        pane.styles.height = min((count + 4 + scrollbar_height if count else 4) + extra, max_height)
         # Move focus before hiding its parent so Textual doesn't select another control.
         if not visible and self.app.focused is table:
             on_hide()

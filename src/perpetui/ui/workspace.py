@@ -104,28 +104,30 @@ class ChartWorkspace(MessagePump):
 
     def _default_chart_symbol(self, index: int) -> str:
         client = (
-            self._active_frame().session.hub.client
-            if self.portfolio is not None else self.client
+            self._active_frame().session.hub.client if self.portfolio is not None else self.client
         )
-        candidates = list(dict.fromkeys(
-            p.symbol for p in self.positions
-            if self.portfolio is None or p.account.exchange == client.exchange.lower()
-        ))
+        candidates = list(
+            dict.fromkeys(
+                p.symbol
+                for p in self.positions
+                if self.portfolio is None or p.account.exchange == client.exchange.lower()
+            )
+        )
         known = self.query_one(SymbolSearch).symbols
         for coin in ("BTC", "ETH", "SOL"):
             symbol = client.normalize_symbol(coin)
             if symbol in known and symbol not in candidates:
                 candidates.append(symbol)
         return (
-            candidates[index - 1] if len(candidates) >= index
-            else client.default_symbol if self.portfolio is not None else self.symbol
+            candidates[index - 1]
+            if len(candidates) >= index
+            else client.default_symbol
+            if self.portfolio is not None
+            else self.symbol
         )
 
     def _new_chart_session(self, index: int, symbol: str, interval: str) -> ChartSession:
-        hub = (
-            self._active_frame().session.hub
-            if self.portfolio is not None else self.feed_hub
-        )
+        hub = self._active_frame().session.hub if self.portfolio is not None else self.feed_hub
         session = ChartSession(hub, index, symbol, interval)
         self.charts.append(session)
         return session
@@ -161,7 +163,8 @@ class ChartWorkspace(MessagePump):
                         zoom=zoom,
                         autoload=(
                             self.portfolio is not None
-                            or self._initial_selection or not self.client.authenticated
+                            or self._initial_selection
+                            or not self.client.authenticated
                         ),
                     )
                 )

@@ -12,13 +12,24 @@ from perpetui.services.portfolio import AccountRef, PortfolioService, instrument
 
 
 def position(
-    symbol: str, side: str, size: str, *,
-    settlement: str = "USDT", contract_size: str | None = "1",
+    symbol: str,
+    side: str,
+    size: str,
+    *,
+    settlement: str = "USDT",
+    contract_size: str | None = "1",
 ) -> Position:
     return Position(
-        id="same-id", symbol=symbol, side=side, contracts=Decimal(size),
-        entry=Decimal(100), liquidation=Decimal(0), leverage=10,
-        margin=Decimal(10), margin_mode="Cross", mark=Decimal(110),
+        id="same-id",
+        symbol=symbol,
+        side=side,
+        contracts=Decimal(size),
+        entry=Decimal(100),
+        liquidation=Decimal(0),
+        leverage=10,
+        margin=Decimal(10),
+        margin_mode="Cross",
+        mark=Decimal(110),
         contract_size=Decimal(contract_size) if contract_size is not None else None,
         settlement=settlement,
     )
@@ -46,12 +57,17 @@ class FakeSource:
 async def test_same_position_id_across_accounts_and_partial_failure() -> None:
     hl = FakeSource([position("BTC", "LONG", "0.5", settlement="USDC")])
     mexc = FakeSource([position("BTC_USDT", "SHORT", "3", contract_size="0.1")])
-    service = PortfolioService([
-        (AccountRef("hl", "hyperliquid", label="main"), hl),
-        (AccountRef("mexc", "mexc", label="trading"), mexc),
-    ], profiles={"hedge": ("hl", "mexc")}, fx_rates={
-        "USDC": Decimal("1"), "USDT": Decimal("1"),
-    })
+    service = PortfolioService(
+        [
+            (AccountRef("hl", "hyperliquid", label="main"), hl),
+            (AccountRef("mexc", "mexc", label="trading"), mexc),
+        ],
+        profiles={"hedge": ("hl", "mexc")},
+        fx_rates={
+            "USDC": Decimal("1"),
+            "USDT": Decimal("1"),
+        },
+    )
     try:
         await service.refresh()
         assert len(service.positions) == 2
@@ -65,7 +81,8 @@ async def test_same_position_id_across_accounts_and_partial_failure() -> None:
         assert exposure.net_size == Decimal("0.2")
         assert exposure.gross_size == Decimal("0.8")
         assert service.totals(service.positions) == {
-            "USDC": Decimal("5.0"), "USDT": Decimal("-3.0"),
+            "USDC": Decimal("5.0"),
+            "USDT": Decimal("-3.0"),
         }
         assert service.usd_pnl(service.positions) == Decimal("2.0")
 

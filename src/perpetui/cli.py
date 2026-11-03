@@ -43,7 +43,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-h", "--help", action="help", help=_("Show this help message and exit"))
     parser.add_argument("--lang", choices=LANGUAGES, help=_("UI language (default: system locale)"))
     parser.add_argument(
-        "--config", default=None,
+        "--config",
+        default=None,
         help=_("Optional account portfolio TOML (default: ~/.config/perpetui/config.toml)"),
     )
     parser.add_argument(
@@ -182,13 +183,17 @@ def main(argv: list[str] | None = None) -> int:
                 source = create_account_client(args, account)
                 if not source.authenticated and not args.demo and not args.demo_empty:
                     raise CredentialsError(f"Account unavailable: {account.id}")
-                sources.append((
-                    AccountRef(
-                        account.id, account.exchange,
-                        "testnet" if account.testnet else "mainnet", account.label,
-                    ),
-                    source,
-                ))
+                sources.append(
+                    (
+                        AccountRef(
+                            account.id,
+                            account.exchange,
+                            "testnet" if account.testnet else "mainnet",
+                            account.label,
+                        ),
+                        source,
+                    )
+                )
         client_factory = create_client_factory(args)
         client = client_factory(
             {"hl": "hyperliquid", "lt": "lighter"}.get(args.exchange, args.exchange)

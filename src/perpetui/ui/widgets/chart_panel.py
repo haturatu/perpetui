@@ -150,7 +150,8 @@ class ChartPanel(ChartFrame):
         prefix = f"{self.index} · " if self.numbered else ""
         exchange = (
             f"{self.session.hub.client.exchange.upper()} · "
-            if getattr(self.app, "portfolio", None) is not None else ""
+            if getattr(self.app, "portfolio", None) is not None
+            else ""
         )
         self.border_title = (
             f" {prefix}{exchange}{self.symbol.replace('_', ' / ')} · {self.interval} · "
