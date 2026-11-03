@@ -109,14 +109,17 @@ class ChartWorkspace(MessagePump):
         )
         candidates = list(dict.fromkeys(
             p.symbol for p in self.positions
-            if self.portfolio is None or p.account.exchange == client.exchange
+            if self.portfolio is None or p.account.exchange == client.exchange.lower()
         ))
         known = self.query_one(SymbolSearch).symbols
         for coin in ("BTC", "ETH", "SOL"):
             symbol = client.normalize_symbol(coin)
             if symbol in known and symbol not in candidates:
                 candidates.append(symbol)
-        return candidates[index - 1] if len(candidates) >= index else self.symbol
+        return (
+            candidates[index - 1] if len(candidates) >= index
+            else client.default_symbol if self.portfolio is not None else self.symbol
+        )
 
     def _new_chart_session(self, index: int, symbol: str, interval: str) -> ChartSession:
         hub = (
@@ -177,9 +180,10 @@ class ChartWorkspace(MessagePump):
             frame.set_class(frame is panel if panel else frame.id == "chart-pane", "active")
         selector = self.query_one("#timeframe", Select)
         with selector.prevent(Select.Changed):
-            selector.value = panel.interval if panel else self.interval
+            if self.portfolio is None:
+                selector.value = panel.interval if panel else self.interval
         if self.portfolio is not None:
-            exchange = self._active_frame().session.hub.client.exchange
+            exchange = self._active_frame().session.hub.client.exchange.lower()
             exchange_selector = self.query_one("#exchange", Select)
             previous_exchange = exchange_selector.value
             with exchange_selector.prevent(Select.Changed):
@@ -281,7 +285,7 @@ class ChartWorkspace(MessagePump):
         with selector.prevent(Select.Changed):
             selector.value = interval
         for panel in self.query(ChartPanel):
-            if panel.interval != interval:
+            if interval in panel.session.hub.client.intervals and panel.interval != interval:
                 panel.change(interval=interval)
         self._status()
 
