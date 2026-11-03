@@ -46,6 +46,58 @@ perpetui --symbol SOL --interval 1h --lang ja
 
 Hyperliquid と Lighter は、秘密鍵を使わずに監視先を指定できます。一方、MEXC のポジション取得には認証設定が必要です。アカウントの読み込み順やテストネット、通信先は[取引所の設定](docs/exchanges.md)にまとめています。
 
+## 複数アカウントと統合ポートフォリオ
+
+異なる取引所のポジションを一緒に確認したい場合は、
+`~/.config/perpetui/config.toml` に監視対象を登録できます。
+設定ファイルがなければ、従来の単一アカウントの起動方法のままです。
+
+```toml
+[portfolio]
+default_view = "all"
+group_by = "symbol"
+
+[[accounts]]
+id = "hl-main"
+exchange = "hyperliquid"
+account = "main"
+
+[[accounts]]
+id = "hl-sub"
+exchange = "hyperliquid"
+wallet_address = "0x0000000000000000000000000000000000000000"
+
+[[accounts]]
+id = "mexc-main"
+exchange = "mexc"
+account = "main"
+
+[[accounts]]
+id = "lighter-main"
+exchange = "lighter"
+lighter_account_index = 12345
+
+[[portfolios]]
+id = "trading"
+accounts = ["hl-main", "mexc-main"]
+```
+
+アドレスとアカウント番号は実際の値に置き換えてください。MEXC の API キーはこの設定ファイルに書かず、
+既存の mexc-cli の保存済みアカウントを参照します。
+`--config /path/to/config.toml` でも指定できます。
+
+ポジション欄では全取引所・個別取引所・アカウント・名前付きポートフォリオを切り替えられます。
+並び順は通常・取引所別・銘柄別から選べます。チャートの上部にある取引所選択は、
+統合モードでは**選択中のチャート枠のみ**に適用されます。
+ポジション行を選択すると、その取引所のチャートに切り替わります。
+別の枠や他の取引所のポジション監視は継続します。
+
+合計 uPnL は USDC、USDT など通貨別に計算します。
+数量のネット・グロス集計は換算可能な線形契約に限定し、清算価格・レバレッジ・ROE は合算しません。
+任意で `[portfolio.fx_rates]` に `USDC = 1.0` のように手動レートを設定すると USD 換算参考値を表示できます。
+為替レートを明示しない場合、USD 換算の合計は表示しません。
+接続できないアカウントは STALE と表示し、最後のスナップショットを残します。
+
 ## 複数チャートとポジション
 
 複数チャートを並べると、画面の横幅によっては無駄な空きが出ます。なので、既定の Auto 配置では、チャート数とターミナルの幅・高さに合わせて枠を組み替えます。
@@ -65,7 +117,7 @@ Hyperliquid と Lighter は、秘密鍵を使わずに監視先を指定でき�
 | `1`〜`9` | 操作するチャートを選択 |
 | `l` | Auto / Horizontal / Grid / Vertical を選択 |
 | `/` | 銘柄を検索 |
-| `e` | 取引所を切り替え |
+| `e` | 取引所を切り替え（統合モードでは選択中のチャートのみ） |
 | `[` / `]` | 時間足を変更 |
 | `←` / `→`、`End` | 過去の足を見る／最新に戻る |
 | `z` | チャートを最大化／元に戻す |
