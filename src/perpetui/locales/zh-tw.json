@@ -146,5 +146,22 @@
   "Time zoom in": "放大時間軸",
   "Maximize": "最大化",
   "Positions": "持倉",
-  "Commands": "命令"
+  "Commands": "命令",
+  "All accounts": "所有帳戶",
+  "Original": "預設",
+  "Exposure": "曝險",
+  "Source": "來源",
+  "Qty": "數量",
+  "Asset": "資產",
+  "Long": "多頭",
+  "Short": "空頭",
+  "Net": "淨曝險",
+  "Gross": "總曝險",
+  "Long %": "多頭佔比",
+  "No open positions in selected accounts": "所選帳戶沒有持倉",
+  "No comparable linear contract positions": "沒有可比較的線性合約持倉",
+  "Portfolio: {name}": "投資組合: {name}",
+  "Exchange: {exchange}": "交易所: {exchange}",
+  "{exchange} margin {margin} {currency}": "{exchange} 保證金 {margin} {currency}",
+  "Optional account portfolio TOML (default: ~/.config/perpetui/config.toml)": "選用的多帳戶組合 TOML（預設 ~/.config/perpetui/config.toml）"
 }
