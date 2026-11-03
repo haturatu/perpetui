@@ -146,5 +146,22 @@
   "Time zoom in": "時間軸を縮小",
   "Maximize": "最大化",
   "Positions": "ポジション",
-  "Commands": "コマンド"
+  "Commands": "コマンド",
+  "All accounts": "全アカウント",
+  "Original": "通常",
+  "Exposure": "エクスポージャー",
+  "Source": "接続先",
+  "Qty": "数量",
+  "Asset": "銘柄",
+  "Long": "ロング",
+  "Short": "ショート",
+  "Net": "差引数量",
+  "Gross": "総数量",
+  "Long %": "ロング比率",
+  "No open positions in selected accounts": "選択したアカウントに保有ポジションはありません",
+  "No comparable linear contract positions": "比較できる線形先物ポジションはありません",
+  "Portfolio: {name}": "ポートフォリオ: {name}",
+  "Exchange: {exchange}": "取引所: {exchange}",
+  "{exchange} margin {margin} {currency}": "{exchange} 証拠金 {margin} {currency}",
+  "Optional account portfolio TOML (default: ~/.config/perpetui/config.toml)": "複数アカウント設定 TOML（既定: ~/.config/perpetui/config.toml）"
 }
