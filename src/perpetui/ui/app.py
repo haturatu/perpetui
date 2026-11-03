@@ -106,6 +106,7 @@ class TradingApp(ChartWorkspace, App[None]):
         client_factory: Callable[[str], DataSource] | None = None,
         portfolio_sources: list[tuple[AccountRef, DataSource]] | None = None,
         portfolio_config: PortfolioConfig | None = None,
+        initial_network: str = "mainnet",
     ) -> None:
         super().__init__()
         for key, bindings in self._bindings.key_to_bindings.items():
@@ -128,9 +129,14 @@ class TradingApp(ChartWorkspace, App[None]):
         self._initial_interval = interval
         self.refresh_seconds = refresh_seconds
         self._reset_data(symbol)
-        self._market_hubs = {client.exchange.lower(): self.feed_hub}
-        self._market_histories = {client.exchange.lower(): self.history_service}
-        self._chart_clients = {client.exchange.lower(): client}
+        self._initial_network = initial_network
+        initial_key = (
+            client.exchange.lower() if initial_network == "mainnet"
+            else f"{client.exchange.lower()}:{initial_network}"
+        )
+        self._market_hubs = {initial_key: self.feed_hub}
+        self._market_histories = {initial_key: self.history_service}
+        self._chart_clients = {initial_key: client}
         self.portfolio = (
             PortfolioService(
                 portfolio_sources,
@@ -340,8 +346,6 @@ class TradingApp(ChartWorkspace, App[None]):
         await asyncio.gather(*(worker.wait() for worker in workers), return_exceptions=True)
         await asyncio.gather(*(panel.stop() for panel in self.query(ChartPanel)))
         await self.positions_service.close()
-        if self.portfolio is not None:
-            await self.portfolio.close()
         await asyncio.gather(
             *(service.close() for service in self._market_histories.values()),
             return_exceptions=True,
@@ -350,6 +354,8 @@ class TradingApp(ChartWorkspace, App[None]):
             *(hub.close() for hub in self._market_hubs.values()),
             return_exceptions=True,
         )
+        if self.portfolio is not None:
+            await self.portfolio.close()
         await asyncio.gather(
             *(client.close() for client in self._chart_clients.values()),
             return_exceptions=True,
@@ -370,22 +376,35 @@ class TradingApp(ChartWorkspace, App[None]):
         selected = next((p for p in matches if p.id == self._selected_id), None)
         return (selected or matches[0]).entry if matches else None
 
-    def _market_hub_for(self, exchange: str) -> MarketFeedHub:
+    def _market_hub_for(
+        self, exchange: str, account_id: str | None = None
+    ) -> MarketFeedHub:
         exchange = exchange.lower()
-        hub = self._market_hubs.get(exchange)
+        account = (
+            self.portfolio.accounts.get(account_id)
+            if self.portfolio is not None and account_id else None
+        )
+        network = account.network if account is not None else "mainnet"
+        key = exchange if network == "mainnet" else f"{exchange}:{network}"
+        hub = self._market_hubs.get(key)
         if hub is None:
-            if self._client_factory is None:
-                raise ValueError("Chart client factory is not configured")
-            client = self._client_factory(exchange)
-            self._chart_clients[exchange] = client
-            hub = self._market_hubs[exchange] = MarketFeedHub(client)
-            self._market_histories[exchange] = HistoryService(client)
+            if account is not None and network != "mainnet":
+                # Reuse a read-only monitored account for the selected testnet.
+                client = self.portfolio.clients[account_id]
+            else:
+                if self._client_factory is None:
+                    raise ValueError("Chart client factory is not configured")
+                client = self._client_factory(exchange)
+                self._chart_clients[key] = client
+            hub = self._market_hubs[key] = MarketFeedHub(client)
+            self._market_histories[key] = HistoryService(client)
         return hub
 
     def _change_chart_exchange(
-        self, pane: ChartPanel, exchange: str, symbol: str | None = None
+        self, pane: ChartPanel, exchange: str, symbol: str | None = None,
+        account_id: str | None = None,
     ) -> None:
-        hub = self._market_hub_for(exchange)
+        hub = self._market_hub_for(exchange, account_id)
         if pane.session.hub is hub:
             if symbol is not None and symbol != pane.symbol:
                 pane.change(symbol=hub.client.normalize_symbol(symbol))
@@ -702,7 +721,10 @@ class TradingApp(ChartWorkspace, App[None]):
         self.query_one(PositionsPane).update_layout(
             self.client,
             len(self.positions),
-            self.positions_service.error,
+            (
+                "; ".join(f"{key}: {message}" for key, message in self.portfolio.errors.items())
+                if self.portfolio is not None else self.positions_service.error
+            ),
             self._initial_selection,
             self.workspace.positions_override,
             self.size.height,
@@ -782,7 +804,10 @@ class TradingApp(ChartWorkspace, App[None]):
             pane.set_entry(position.entry)
             if self.portfolio is not None:
                 try:
-                    self._change_chart_exchange(pane, position.account.exchange, position.symbol)
+                    self._change_chart_exchange(
+                        pane, position.account.exchange, position.symbol,
+                        account_id=position.account.id,
+                    )
                     pane.set_entry(position.entry)
                     self.query_one("#exchange", Select).value = position.account.exchange
                 except (CredentialsError, ExchangeError, ValueError, OSError) as exc:
@@ -867,7 +892,17 @@ class TradingApp(ChartWorkspace, App[None]):
             if self.portfolio is not None and isinstance(chart.parent, ChartPanel)
             else self.client.exchange.lower()
         )
-        service = self._market_histories.get(exchange, self.history_service)
+        if self.portfolio is not None and isinstance(chart.parent, ChartPanel):
+            service = next(
+                (
+                    self._market_histories[key]
+                    for key, hub in self._market_hubs.items()
+                    if hub is chart.parent.session.hub
+                ),
+                self.history_service,
+            )
+        else:
+            service = self._market_histories.get(exchange, self.history_service)
         generation = self._generation
         symbol, interval = chart.market.symbol, chart.market.interval
         try:
