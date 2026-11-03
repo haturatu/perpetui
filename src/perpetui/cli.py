@@ -202,6 +202,7 @@ def main(argv: list[str] | None = None) -> int:
             client_factory=client_factory,
             portfolio_sources=sources if configuration is not None else None,
             portfolio_config=configuration,
+            initial_network="testnet" if args.testnet else "mainnet",
         )
         app.run()
         return app.return_code or 0
