@@ -176,6 +176,17 @@ class PortfolioService:
             )
         return exposure
 
+    @staticmethod
+    def margin_by_venue(
+        positions: list[PortfolioPosition],
+    ) -> dict[tuple[str, str], Decimal]:
+        """Margin remains segregated by venue and denomination."""
+        margins: dict[tuple[str, str], Decimal] = {}
+        for item in positions:
+            key = (item.account.exchange, item.position.settlement.upper())
+            margins[key] = margins.get(key, Decimal(0)) + item.position.margin
+        return margins
+
     def usd_pnl(self, positions: list[PortfolioPosition]) -> Decimal | None:
         # Explicit user-provided FX rates only; never assume stablecoins equal USD.
         if not positions or any(item.position.pnl is None for item in positions):
