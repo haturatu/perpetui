@@ -30,8 +30,12 @@ class PositionsPane(Vertical):
                 id="position-scope",
             )
             yield Select(
-                [("Original", "none"), ("Exchange", "exchange"),
-                 ("Symbol", "symbol"), ("Exposure", "exposure")],
+                [
+                    ("Original", "none"),
+                    ("Exchange", "exchange"),
+                    ("Symbol", "symbol"),
+                    ("Exposure", "exposure"),
+                ],
                 value="none",
                 allow_blank=False,
                 compact=True,
@@ -178,9 +182,9 @@ class PositionsPane(Vertical):
                         f"  ·  {exposure.instrument} net {exposure.net_size:+} "
                         f"/ gross {exposure.gross_size}"
                     )
-        risk_mode = portfolio is not None and getattr(
-            self.app, "_portfolio_group", "none"
-        ) == "exposure"
+        risk_mode = (
+            portfolio is not None and getattr(self.app, "_portfolio_group", "none") == "exposure"
+        )
         exposure_table = self.query_one("#exposures", DataTable)
         exposure_table.display = False
         if risk_mode:
@@ -189,7 +193,8 @@ class PositionsPane(Vertical):
             for exposure in sorted(exposures.values(), key=lambda item: item.instrument):
                 ratio = (
                     exposure.long_size / exposure.gross_size * Decimal(100)
-                    if exposure.gross_size else Decimal(0)
+                    if exposure.gross_size
+                    else Decimal(0)
                 )
                 exposure_table.add_row(
                     exposure.instrument,

@@ -1,11 +1,12 @@
 """End-to-end account filtering, exposure view and per-pane exchange routing."""
 
+from textual.widgets import DataTable, Select
+
 from perpetui.config import PortfolioConfig
 from perpetui.exchanges.demo import DemoClient
 from perpetui.services.portfolio import AccountRef
 from perpetui.ui.app import TradingApp
 from perpetui.ui.widgets.chart_panel import ExtraChart
-from textual.widgets import DataTable, Select
 
 
 async def settle(app, pilot):
@@ -21,9 +22,7 @@ async def test_multi_account_filters_risk_and_independent_chart_venues():
             (AccountRef("hl", "hyperliquid", label="main"), DemoClient(exchange="hyperliquid")),
             (AccountRef("mexc", "mexc", label="trading"), DemoClient(exchange="mexc")),
         ],
-        portfolio_config=PortfolioConfig(
-            profiles={"hedge": ("hl", "mexc")}, default_view="all"
-        ),
+        portfolio_config=PortfolioConfig(profiles={"hedge": ("hl", "mexc")}, default_view="all"),
         client_factory=lambda exchange: DemoClient(exchange=exchange),
         refresh_seconds=3600,
     )

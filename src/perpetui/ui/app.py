@@ -774,7 +774,9 @@ class TradingApp(ChartWorkspace, App[None]):
         errors = (
             [f"{key}: {value}" for key, value in self.portfolio.errors.items()]
             if self.portfolio is not None
-            else [self.positions_service.error] if self.positions_service.error else []
+            else [self.positions_service.error]
+            if self.positions_service.error
+            else []
         )
         errors.extend([market_error] if market_error else [])
         status.set_class(bool(errors), "error")
