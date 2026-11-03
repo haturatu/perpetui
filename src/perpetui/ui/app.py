@@ -635,15 +635,28 @@ class TradingApp(ChartWorkspace, App[None]):
 
     @on(Select.Changed, "#position-scope")
     def position_scope_changed(self, event: Select.Changed) -> None:
-        if self.portfolio is not None and isinstance(event.value, str):
+        # configure_portfolio() applies the configured view before the widget's
+        # initial Changed message arrives; that queued message still carries the
+        # compose-time default and must not overwrite the config.
+        if (
+            self.portfolio is not None
+            and isinstance(event.value, str)
+            and event.value == event.select.value
+        ):
             self._portfolio_scope = event.value
             self._render_positions()
+            self._status()
 
     @on(Select.Changed, "#position-group")
     def position_group_changed(self, event: Select.Changed) -> None:
-        if self.portfolio is not None and event.value in {"none", "exchange", "symbol", "exposure"}:
+        if (
+            self.portfolio is not None
+            and event.value in {"none", "exchange", "symbol", "exposure"}
+            and event.value == event.select.value
+        ):
             self._portfolio_group = str(event.value)
             self._render_positions()
+            self._status()
 
     def _set_positions(self, snapshot: Positions) -> None:
         if not self._view_ready():

@@ -35,6 +35,9 @@ async def test_multi_account_filters_risk_and_independent_chart_venues():
         await settle(app, pilot)
         assert len(app.positions) == 3
         assert all(item.account.exchange == "mexc" for item in app.positions)
+        status = str(app.query_one("#status").render())
+        assert "3 positions" in status
+        assert "6 positions" not in status
 
         app.query_one("#position-group", Select).value = "exposure"
         await settle(app, pilot)
@@ -56,3 +59,26 @@ async def test_multi_account_filters_risk_and_independent_chart_venues():
         assert app.charts[0].hub.client.exchange.lower() == "mexc"
         assert second.session.hub.client.exchange.lower() == "hyperliquid"
         assert len(app.positions) == 3
+
+
+async def test_configured_default_view_and_group_are_applied_on_startup():
+    app = TradingApp(
+        DemoClient(exchange="hyperliquid"),
+        portfolio_sources=[
+            (AccountRef("hl", "hyperliquid", label="main"), DemoClient(exchange="hyperliquid")),
+            (AccountRef("mexc", "mexc", label="trading"), DemoClient(exchange="mexc")),
+        ],
+        portfolio_config=PortfolioConfig(
+            profiles={"hedge": ("hl", "mexc")}, default_view="account:hl", group_by="symbol"
+        ),
+        client_factory=lambda exchange: DemoClient(exchange=exchange),
+        refresh_seconds=3600,
+    )
+    async with app.run_test(size=(140, 44)) as pilot:
+        await settle(app, pilot)
+        assert app._portfolio_scope == "account:hl"
+        assert app._portfolio_group == "symbol"
+        assert app.query_one("#position-scope", Select).value == "account:hl"
+        assert app.query_one("#position-group", Select).value == "symbol"
+        assert len(app.positions) == 3
+        assert all(item.account.id == "hl" for item in app.positions)
