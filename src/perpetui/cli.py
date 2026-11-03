@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
+from perpetui.config import create_account_client, load_config
 from perpetui.domain.intervals import INTERVAL_SECONDS
 from perpetui.errors import CredentialsError
 from perpetui.exchanges.factory import create_client_factory, intervals_for
@@ -9,6 +11,7 @@ from perpetui.exchanges.lighter.account import validate_account_index
 from perpetui.i18n import LANGUAGES, _, install_language
 from perpetui.konsole import install_keymap
 from perpetui.logging_config import configure_logging
+from perpetui.services.portfolio import AccountRef
 from perpetui.ui.app import TradingApp
 
 from . import __version__
@@ -39,6 +42,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("-h", "--help", action="help", help=_("Show this help message and exit"))
     parser.add_argument("--lang", choices=LANGUAGES, help=_("UI language (default: system locale)"))
+    parser.add_argument(
+        "--config", default=None,
+        help=_("Optional account portfolio TOML (default: ~/.config/perpetui/config.toml)"),
+    )
     parser.add_argument(
         "--install-konsole-keymap",
         action="store_true",
@@ -165,6 +172,23 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
             return 0
+        config_path = Path(args.config or "~/.config/perpetui/config.toml").expanduser()
+        if args.config and not config_path.is_file():
+            raise ValueError(f"Config file not found: {config_path}")
+        configuration = None if args.public else load_config(config_path)
+        sources = []
+        if configuration is not None:
+            for account in configuration.accounts:
+                source = create_account_client(args, account)
+                if not source.authenticated and not args.demo and not args.demo_empty:
+                    raise CredentialsError(f"Account unavailable: {account.id}")
+                sources.append((
+                    AccountRef(
+                        account.id, account.exchange,
+                        "testnet" if account.testnet else "mainnet", account.label,
+                    ),
+                    source,
+                ))
         client_factory = create_client_factory(args)
         client = client_factory(
             {"hl": "hyperliquid", "lt": "lighter"}.get(args.exchange, args.exchange)
@@ -176,6 +200,8 @@ def main(argv: list[str] | None = None) -> int:
             interval=args.interval,
             refresh_seconds=args.refresh,
             client_factory=client_factory,
+            portfolio_sources=sources if configuration is not None else None,
+            portfolio_config=configuration,
         )
         app.run()
         return app.return_code or 0
