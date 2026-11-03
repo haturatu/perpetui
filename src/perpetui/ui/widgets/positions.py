@@ -30,7 +30,8 @@ class PositionsPane(Vertical):
                 id="position-scope",
             )
             yield Select(
-                [("Original", "none"), ("Exchange", "exchange"), ("Symbol", "symbol")],
+                [("Original", "none"), ("Exchange", "exchange"),
+                 ("Symbol", "symbol"), ("Exposure", "exposure")],
                 value="none",
                 allow_blank=False,
                 compact=True,
@@ -38,6 +39,7 @@ class PositionsPane(Vertical):
             )
         yield Static("", id="positions-summary")
         yield DataTable(id="positions", cursor_type="row", zebra_stripes=True)
+        yield DataTable(id="exposures", cursor_type="none", zebra_stripes=True)
         yield Static(_("Loading open positions…"), id="empty")
 
     def configure_portfolio(
@@ -53,7 +55,11 @@ class PositionsPane(Vertical):
 
     def setup(self, client: DataSource, *, portfolio: bool = False) -> None:
         self.query_one("#portfolio-filters").display = portfolio
-        table = self.query_one(DataTable)
+        exposure_table = self.query_one("#exposures", DataTable)
+        exposure_table.display = False
+        exposure_table.clear(columns=True)
+        exposure_table.add_columns("Asset", "Long", "Short", "Net", "Gross", "Long %")
+        table = self.query_one("#positions", DataTable)
         with table.prevent(DataTable.RowHighlighted):
             table.clear(columns=True)
         table.add_columns(
@@ -84,7 +90,7 @@ class PositionsPane(Vertical):
         *,
         portfolio: PortfolioService | None = None,
     ) -> str | None:
-        table = self.query_one(DataTable)
+        table = self.query_one("#positions", DataTable)
         previous_id = selected_id
         same_rows = [row.value for row in table.rows] == [p.id for p in positions]
         with table.prevent(DataTable.RowHighlighted):
@@ -172,6 +178,35 @@ class PositionsPane(Vertical):
                         f"  ·  {exposure.instrument} net {exposure.net_size:+} "
                         f"/ gross {exposure.gross_size}"
                     )
+        risk_mode = portfolio is not None and getattr(
+            self.app, "_portfolio_group", "none"
+        ) == "exposure"
+        exposure_table = self.query_one("#exposures", DataTable)
+        exposure_table.display = False
+        if risk_mode:
+            exposures = portfolio.exposures(positions)
+            exposure_table.clear()
+            for exposure in sorted(exposures.values(), key=lambda item: item.instrument):
+                ratio = (
+                    exposure.long_size / exposure.gross_size * Decimal(100)
+                    if exposure.gross_size else Decimal(0)
+                )
+                exposure_table.add_row(
+                    exposure.instrument,
+                    str(exposure.long_size),
+                    str(exposure.short_size),
+                    f"{exposure.net_size:+}",
+                    str(exposure.gross_size),
+                    f"{ratio:.1f}%",
+                )
+            table.display = False
+            exposure_table.display = bool(exposures)
+            if not exposures:
+                empty.display = True
+                empty.update(_("No comparable linear contract positions"))
+            margins = portfolio.margin_by_venue(positions)
+            for (exchange, currency), margin in sorted(margins.items()):
+                summary.append(f"  ·  {exchange} margin {price(margin)} {currency}")
         self.query_one("#positions-summary", Static).update(summary)
         return selected_id
 
@@ -188,7 +223,7 @@ class PositionsPane(Vertical):
         portfolio_enabled: bool = False,
     ) -> None:
         pane = self
-        table = self.query_one(DataTable)
+        table = self.query_one("#positions", DataTable)
         visible = (client.authenticated or portfolio_enabled) and (
             override if override is not None else bool(count or error or not initial_selection)
         )
