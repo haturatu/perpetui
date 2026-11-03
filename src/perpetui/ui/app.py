@@ -113,7 +113,6 @@ class TradingApp(ChartWorkspace, App[None]):
             self._bindings.key_to_bindings[key] = [
                 replace(binding, description=_(binding.description)) for binding in bindings
             ]
-        self.title = f"{client.exchange} Terminal"
         self.client = client
         self._client_factory = client_factory
         self._generation = 0
@@ -149,6 +148,9 @@ class TradingApp(ChartWorkspace, App[None]):
         )
         self._portfolio_scope = portfolio_config.default_view if portfolio_config else "all"
         self._portfolio_group = portfolio_config.group_by if portfolio_config else "none"
+        self.title = (
+            "perpetui Portfolio" if self.portfolio is not None else f"{client.exchange} Terminal"
+        )
         if self.portfolio is not None:
             self.portfolio.on_change = self._portfolio_changed
 
@@ -223,7 +225,12 @@ class TradingApp(ChartWorkspace, App[None]):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="topbar"):
-            yield Static(f"◈  {self.client.exchange.upper()}  /  TERMINAL", id="brand")
+            yield Static(
+                "◈  PORTFOLIO  /  TERMINAL"
+                if self.portfolio is not None
+                else f"◈  {self.client.exchange.upper()}  /  TERMINAL",
+                id="brand",
+            )
             yield Select(
                 [("Hyperliquid", "hyperliquid"), ("Lighter", "lighter"), ("MEXC", "mexc")],
                 value=self.client.exchange.lower(),
