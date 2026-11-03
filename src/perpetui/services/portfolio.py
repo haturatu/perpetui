@@ -119,8 +119,7 @@ class PortfolioService:
     def options(self) -> list[tuple[str, str]]:
         entries = [(_("All accounts"), "all")]
         entries.extend(
-            (_("Portfolio: {name}", name=name), f"portfolio:{name}")
-            for name in self.profiles
+            (_("Portfolio: {name}", name=name), f"portfolio:{name}") for name in self.profiles
         )
         entries.extend(
             (_("Exchange: {exchange}", exchange=exchange), f"exchange:{exchange}")
