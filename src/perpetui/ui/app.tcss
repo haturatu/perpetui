@@ -23,6 +23,9 @@ SelectCurrent { border: tall #233149; background: #101a2a; }
 CandleChart { height: 1fr; }
 #positions-pane { height: auto; min-height: 0; margin: 0 1; border: round #233149;
     border-title-color: #aebfd8; }
+#portfolio-filters { height: 3; padding: 0 1; align-vertical: middle; }
+#position-scope { width: 1fr; min-width: 20; }
+#position-group { width: 16; }
 #positions-summary { height: 1; padding: 0 1; color: #788ba9; }
 DataTable { height: 1fr; background: #080e18; }
 DataTable > .datatable--header { background: #101a2a; color: #788ba9; text-style: none; }
@@ -36,3 +39,4 @@ Footer > .footer--key { background: #192d49; color: #b6cdff; }
 Screen.compact #topbar { height: 1; border: none; }
 Screen.compact #market-summary { height: 2; }
 Screen.compact #candle-info { display: none; }
+Screen.compact #position-group { width: 12; }
