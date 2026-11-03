@@ -128,9 +128,9 @@ class TradingApp(ChartWorkspace, App[None]):
         self._initial_interval = interval
         self.refresh_seconds = refresh_seconds
         self._reset_data(symbol)
-        self._market_hubs = {client.exchange: self.feed_hub}
-        self._market_histories = {client.exchange: self.history_service}
-        self._chart_clients = {client.exchange: client}
+        self._market_hubs = {client.exchange.lower(): self.feed_hub}
+        self._market_histories = {client.exchange.lower(): self.history_service}
+        self._chart_clients = {client.exchange.lower(): client}
         self.portfolio = (
             PortfolioService(
                 portfolio_sources,
@@ -359,18 +359,19 @@ class TradingApp(ChartWorkspace, App[None]):
         if exchange is None:
             exchange = (
                 self._active_frame().session.hub.client.exchange
-                if self.portfolio is not None and self.is_mounted else self.client.exchange
+                if self.portfolio is not None and self.is_mounted else self.client.exchange.lower()
             )
         matches = [
             p for p in self.positions if p.symbol == symbol
             and (
-                self.portfolio is None or p.account.exchange == exchange
+                self.portfolio is None or p.account.exchange == exchange.lower()
             )
         ]
         selected = next((p for p in matches if p.id == self._selected_id), None)
         return (selected or matches[0]).entry if matches else None
 
     def _market_hub_for(self, exchange: str) -> MarketFeedHub:
+        exchange = exchange.lower()
         hub = self._market_hubs.get(exchange)
         if hub is None:
             if self._client_factory is None:
@@ -424,7 +425,7 @@ class TradingApp(ChartWorkspace, App[None]):
             and isinstance(event.value, str)
         ):
             pane = self._active_frame()
-            if event.value != pane.session.hub.client.exchange:
+            if event.value != pane.session.hub.client.exchange.lower():
                 try:
                     self._change_chart_exchange(pane, event.value)
                 except (CredentialsError, ExchangeError, ValueError, OSError) as exc:
@@ -432,7 +433,7 @@ class TradingApp(ChartWorkspace, App[None]):
                                 severity="error")
                     selector = self.query_one("#exchange", Select)
                     with selector.prevent(Select.Changed):
-                        selector.value = pane.session.hub.client.exchange
+                        selector.value = pane.session.hub.client.exchange.lower()
             return
         if (
             self._client_factory is not None
@@ -490,6 +491,9 @@ class TradingApp(ChartWorkspace, App[None]):
             retired, self.client = self.client, candidate
             candidate = None
             self._reset_data()
+            self._market_hubs = {self.client.exchange.lower(): self.feed_hub}
+            self._market_histories = {self.client.exchange.lower(): self.history_service}
+            self._chart_clients = {self.client.exchange.lower(): self.client}
             primary = self.query_one("#chart-pane", ChartPanel)
             primary.session = self.charts[0]
             primary.session.on_change = primary._session_changed
@@ -532,7 +536,7 @@ class TradingApp(ChartWorkspace, App[None]):
                 self.action_positions()
 
     def _entry(self) -> Decimal | None:
-        return self._entry_for(self.symbol, self.charts[0].hub.client.exchange)
+        return self._entry_for(self.symbol, self.charts[0].hub.client.exchange.lower())
 
     def refresh_data(self) -> None:
         if self._switching or self._closing:
@@ -584,7 +588,7 @@ class TradingApp(ChartWorkspace, App[None]):
         if not self._initial_selection and self.portfolio.ready:
             if not self._manual_symbol:
                 matching = next(
-                    (p for p in self.positions if p.account.exchange == self.client.exchange),
+                    (p for p in self.positions if p.account.exchange == self.client.exchange.lower()),
                     None,
                 )
                 self.symbol = matching.symbol if matching is not None else self.client.default_symbol
@@ -593,7 +597,7 @@ class TradingApp(ChartWorkspace, App[None]):
             self._start_extra_defaults()
         self._render_positions()
         for panel in self.query(ChartPanel):
-            panel.set_entry(self._entry_for(panel.symbol, panel.session.hub.client.exchange))
+            panel.set_entry(self._entry_for(panel.symbol, panel.session.hub.client.exchange.lower()))
         self._status()
 
     @on(Select.Changed, "#position-scope")
@@ -859,9 +863,9 @@ class TradingApp(ChartWorkspace, App[None]):
             return
         chart.history_busy = True
         exchange = (
-            chart.parent.session.hub.client.exchange
+            chart.parent.session.hub.client.exchange.lower()
             if self.portfolio is not None and isinstance(chart.parent, ChartPanel)
-            else self.client.exchange
+            else self.client.exchange.lower()
         )
         service = self._market_histories.get(exchange, self.history_service)
         generation = self._generation
