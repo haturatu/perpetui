@@ -29,7 +29,34 @@ func TestRootForwardsOnlyChangedFlagsToPython(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"--demo", "--exchange", "lighter", "--lang", "ja", "--refresh", "2.5"}
+	want := []string{
+		"--demo", "single",
+		"--exchange", "lighter",
+		"--lang", "ja",
+		"--refresh", "2.5",
+	}
+	if !slices.Equal(forwarded, want) {
+		t.Fatalf("forwarded = %#v, want %#v", forwarded, want)
+	}
+}
+
+func TestDemoPortfolioModeIsForwarded(t *testing.T) {
+	original := runTUI
+	t.Cleanup(func() { runTUI = original })
+	var forwarded []string
+	runTUI = func(args []string) error {
+		forwarded = args
+		return nil
+	}
+
+	root := NewRootCommand()
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"--demo=portfolio"})
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"--demo", "portfolio"}
 	if !slices.Equal(forwarded, want) {
 		t.Fatalf("forwarded = %#v, want %#v", forwarded, want)
 	}

@@ -104,13 +104,14 @@ make lock          # pip 用ロックファイルを更新
 
 ```sh
 perpetui --demo-empty
+perpetui --demo=portfolio
 perpetui --public
 perpetui --symbol SOL --interval 1h --refresh 10
 perpetui --account main
 perpetui --no-websocket
 ```
 
-`--demo-empty` はポジションなしのサンプル画面、`--public` は認証設定を使わず公開相場だけを表示します。`--no-websocket` では WebSocket を使わず REST で定期的に取得します。
+`--demo-empty` はポジションなしのサンプル画面、`--demo=portfolio` は複数取引所の統合ポートフォリオのサンプル画面、`--public` は認証設定を使わず公開相場だけを表示します。`--no-websocket` では WebSocket を使わず REST で定期的に取得します。
 
 アカウントが設定されていなければポジション欄を使わず、画面の領域をチャートに回します。ポジションが 0 件の場合も一覧を折りたたみます。
 

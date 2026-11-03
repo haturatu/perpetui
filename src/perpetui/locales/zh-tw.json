@@ -166,5 +166,6 @@
   "Optional account portfolio TOML (default: ~/.config/perpetui/config.toml)": "選用的多帳戶組合 TOML（預設 ~/.config/perpetui/config.toml）",
   "ctr": "張",
   "base": "基礎數量",
-  "{instrument} net {net} / gross {gross}": "{instrument} 淨 {net} / 總 {gross}"
+  "{instrument} net {net} / gross {gross}": "{instrument} 淨 {net} / 總 {gross}",
+  "Use sample data; optional mode: single or portfolio": "使用範例資料（可選模式: single 或 portfolio）"
 }

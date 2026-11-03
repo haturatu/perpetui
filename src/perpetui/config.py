@@ -125,6 +125,26 @@ def load_config(path: Path) -> PortfolioConfig | None:
     return PortfolioConfig(tuple(accounts), profiles, view, group, rates)
 
 
+def demo_portfolio_config() -> PortfolioConfig:
+    """Built-in accounts for `perpetui --demo portfolio`; credentials are never read."""
+    accounts = (
+        AccountConfig("hl-main", "hyperliquid", label="main"),
+        AccountConfig("hl-hedge", "hyperliquid", label="hedge"),
+        AccountConfig("mexc-trading", "mexc", label="trading"),
+        AccountConfig("lt-main", "lighter", label="main"),
+    )
+    return PortfolioConfig(
+        accounts=accounts,
+        profiles={
+            "hedge": ("hl-main", "mexc-trading"),
+            "all-venues": tuple(account.id for account in accounts),
+        },
+        default_view="all",
+        group_by="exchange",
+        fx_rates={"USDC": Decimal("1"), "USDT": Decimal("1")},
+    )
+
+
 def create_account_client(args: object, account: AccountConfig) -> DataSource:
     """Use the existing read-only account loaders, never persist credentials here."""
     options = dict(vars(args))

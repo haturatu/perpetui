@@ -19,7 +19,12 @@ git clone https://github.com/haturatu/perpetui.git
 cd perpetui
 make install
 perpetui --demo
+perpetui --demo=portfolio
 ```
+
+`perpetui --demo` は単一取引所のサンプル画面、`perpetui --demo=portfolio` は
+Hyperliquid 2 口座・MEXC・Lighter をまとめた統合ポートフォリオのサンプル画面です。
+どちらも設定ファイルなしで起動できます。
 
 `make install` で、既定では `~/.local/bin/perpetui` と専用の Python 環境、シェル補完、man ページをインストールします。`~/.local/bin` に PATH が通っていない場合は追加してください。
 
@@ -85,6 +90,10 @@ accounts = ["hl-main", "mexc-main"]
 アドレスとアカウント番号は実際の値に置き換えてください。MEXC の API キーはこの設定ファイルに書かず、
 既存の mexc-cli の保存済みアカウントを参照します。
 `--config /path/to/config.toml` でも指定できます。
+
+設定ファイルを作らずに統合表示だけを確認したい場合は、`perpetui --demo=portfolio` を実行してください。
+Hyperliquid 2 口座・MEXC・Lighter のサンプルアカウントと、`hedge` / `all-venues` ポートフォリオが
+組み込まれています。取引所の認証情報は読みません。
 
 ポジション欄では全取引所・個別取引所・アカウント・名前付きポートフォリオを切り替えられます。
 並び順は通常・取引所別・銘柄別から選べます。さらに「Exposure」に切り替えると、

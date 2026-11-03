@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from perpetui.config import create_account_client, load_config
+from perpetui.config import create_account_client, demo_portfolio_config, load_config
 from perpetui.domain.intervals import INTERVAL_SECONDS
 from perpetui.errors import CredentialsError
 from perpetui.exchanges.factory import create_client_factory, intervals_for
@@ -65,7 +65,12 @@ def build_parser() -> argparse.ArgumentParser:
         help=_("Show the version number and exit"),
     )
     parser.add_argument(
-        "--demo", action="store_true", help=_("Use sample data, without network access")
+        "--demo",
+        nargs="?",
+        const="single",
+        choices=("single", "portfolio"),
+        metavar="MODE",
+        help=_("Use sample data; optional mode: single or portfolio"),
     )
     parser.add_argument(
         "--demo-empty", action="store_true", help=_("Demo with no positions (BTC chart)")
@@ -176,7 +181,12 @@ def main(argv: list[str] | None = None) -> int:
         config_path = Path(args.config or "~/.config/perpetui/config.toml").expanduser()
         if args.config and not config_path.is_file():
             raise ValueError(f"Config file not found: {config_path}")
-        configuration = None if args.public else load_config(config_path)
+        if args.public:
+            configuration = None
+        elif args.demo == "portfolio" and not args.config:
+            configuration = demo_portfolio_config()
+        else:
+            configuration = load_config(config_path)
         sources = []
         if configuration is not None:
             for account in configuration.accounts:
