@@ -26,7 +26,7 @@ CandleChart { height: 1fr; }
 #portfolio-filters { height: 3; padding: 0 1; align-vertical: middle; }
 #position-scope { width: 1fr; min-width: 20; }
 #position-group { width: 16; }
-#positions-summary { height: 1; padding: 0 1; color: #788ba9; }
+#positions-summary { height: auto; max-height: 3; padding: 0 1; color: #788ba9; }
 DataTable { height: 1fr; background: #080e18; }
 DataTable > .datatable--header { background: #101a2a; color: #788ba9; text-style: none; }
 DataTable > .datatable--cursor { background: #192d49; color: #e4edf8; }
