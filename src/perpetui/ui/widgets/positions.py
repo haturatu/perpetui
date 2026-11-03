@@ -211,7 +211,15 @@ class PositionsPane(Vertical):
                 empty.update(_("No comparable linear contract positions"))
             margins = portfolio.margin_by_venue(positions)
             for (exchange, currency), margin in sorted(margins.items()):
-                summary.append("  ·  " + _("{exchange} margin {margin} {currency}", exchange=exchange, margin=price(margin), currency=currency))
+                summary.append(
+                    "  ·  "
+                    + _(
+                        "{exchange} margin {margin} {currency}",
+                        exchange=exchange,
+                        margin=price(margin),
+                        currency=currency,
+                    )
+                )
         self.query_one("#positions-summary", Static).update(summary)
         return selected_id
 
