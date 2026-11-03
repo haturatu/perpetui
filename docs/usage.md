@@ -1,10 +1,12 @@
-# 操作方法
+# Usage
 
-perpetui はキーボードだけでも操作できるようにしています。複数のチャートを並べた状態で、どの枠を操作しているかを意識するのが基本です。
+**English** | [日本語](usage.ja.md)
 
-## 表示言語
+perpetui can be operated entirely from the keyboard. With several charts open, the main thing to keep track of is which pane is currently active.
 
-日本語、英語、ロシア語、中国語（簡体字・繁体字）に対応しています。
+## Display language
+
+The interface supports Japanese, English, Russian, and Simplified and Traditional Chinese.
 
 ```sh
 perpetui --lang ja
@@ -15,125 +17,125 @@ perpetui --exchange hyperliquid --lang en
 perpetui --lang ja --help
 ```
 
-`--lang` を省略すると `PERPETUI_LANG`、`LANGUAGE`、`LC_ALL`、`LC_MESSAGES`、`LANG` の順で確認します。`zh_CN.UTF-8` や `zh_TW.UTF-8` のようなロケール表記も、それぞれ `zh-cn` と `zh-tw` として扱います。未設定や未対応の言語は英語です。翻訳文字列は `src/perpetui/locales/` の各 JSON ファイルにあります。
+If `--lang` is omitted, the application checks `PERPETUI_LANG`, `LANGUAGE`, `LC_ALL`, `LC_MESSAGES`, and `LANG` in that order. Locale names such as `zh_CN.UTF-8` and `zh_TW.UTF-8` are mapped to `zh-cn` and `zh-tw`. The fallback for an unset or unsupported language is English. Translation strings are stored in JSON files under `src/perpetui/locales/`.
 
-## チャートを増やす
+## Add more charts
 
-`Ctrl + 1〜9` または画面上部の `×1` などの選択欄で、表示数を変えられます。
+Use `Ctrl + 1–9` or the `×1`, etc. selector at the top to change how many charts are visible.
 
-操作するチャートはクリック、`Tab`、数字キー `1`〜`9` で選びます。選択中の枠は青い線で表示されます。銘柄検索、時間足の変更、価格軸の拡大などは、その枠に対して行います。
+Click a pane or use `Tab` or the number keys `1`–`9` to make it active. The selected pane has a blue border. Symbol search, interval changes, and price-axis zoom apply to that pane.
 
-`z` で選択中の枠だけを最大化し、もう一度押すと元に戻ります。
+Press `z` to maximize the selected pane; press it again to restore the layout.
 
-### なぜ配置を自動にしているのか
+### Why use an automatic layout?
 
-例えば 3 枚のチャートを 2 × 2 のグリッドへ入れると、1 マス分が空いてしまいます。端末が横長の場合も、縦に分割しすぎるとチャートが見づらくなります。
+Putting three charts in a 2 × 2 grid wastes one cell. On a wide terminal, making too many vertical splits also makes the charts harder to read.
 
-なので、既定の **Auto** は画面の横幅・高さとチャート数を見て配置を決めます。3 枚なら「上 1・下 2」、5 枚なら「上 3・下 2」のように、枠を横に広げて余白を減らします。
+The default **Auto** mode therefore chooses a layout based on the terminal's width, height, and chart count. It can arrange three charts as one above two, or five as three above two, widening panes to reduce empty space.
 
-`l` または上部の選択欄から、Auto / Horizontal / Grid / Vertical を手動で指定することもできます。手動配置は端末をリサイズしても維持します。
+You can select Auto / Horizontal / Grid / Vertical manually with `l` or the selector at the top. Manual layouts persist when the terminal is resized.
 
-**配置変更でチャートを作り直すわけではありません。** 履歴カーソルや接続、表示形式は保持します。
+**Changing the layout does not recreate charts.** History cursors, connections, and rendering modes are preserved.
 
-![4 枠のチャート表示（サンプルデータ）](multi-charts.png)
+![Four-chart layout (sample data)](multi-charts.png)
 
-### 時間足とカーソルの同期
+### Sync intervals and cursors
 
-`a` で全チャートの時間足同期を切り替えます。この状態で `[` / `]` を押すと、全枠の時間足が変わります。
+Press `a` to toggle interval synchronization across all charts. While enabled, `[` / `]` changes the interval in every pane.
 
-同期を切り替えずに一回だけ全枠の時間足を変更したい場合は、`Shift + [` / `Shift + ]` を使います。
+To change all intervals once without toggling synchronization, use `Shift + [` / `Shift + ]`.
 
-`s` を押すと、選択中のチャートが指している時刻を、ほかのチャートにも反映します。異なる銘柄の同じタイミングを比較する場合に便利です。
+Press `s` to copy the selected chart's cursor timestamp to the other charts. This is useful when comparing different symbols at the same point in time.
 
-`r` で全チャートを再取得します。取引所を切り替えても、表示数・時間足・表示形式は引き継ぎます。
+Press `r` to reload all charts. The number of panes, intervals, and rendering modes are retained when switching exchanges.
 
-## ポジション欄は必要な分だけ表示する
+## Show only as much of the positions panel as needed
 
-ポジションがないのに一覧が画面を占有するのは無駄なので、0 件のときは自動的に折りたたみます。
+A list with no positions would only waste screen space, so the panel automatically collapses when the count is zero.
 
-少数のポジションはその件数に合わせて表示し、多い場合は端末の高さの約 25%、最大 12 行を上限にスクロールします。狭い端末では横スクロールの領域も確保しています。
+With a few positions, the panel is just tall enough for them. With many positions, it scrolls within approximately 25% of the terminal height, up to 12 rows. Narrow terminals also have space for horizontal scrolling.
 
-取得エラー時は警告を残します。`p` で表示・非表示を手動指定でき、`Shift + P` で自動表示に戻せます。
+Errors leave a warning visible. Press `p` to manually show or hide the panel, or `Shift + P` to return to automatic behavior.
 
-複数チャートを使う場合の画面サイズの目安は、2 枠が 80 × 24、4 枠が 160 × 50、9 枠が 180 × 65 です。余裕があれば 120 × 40 以上を推奨します。
+Approximate terminal sizes for multiple charts are 80 × 24 for two panes, 160 × 50 for four, and 180 × 65 for nine. At least 120 × 40 is recommended if space allows.
 
-## キー操作一覧
+## Keyboard shortcuts
 
-| キー | 操作 |
+| Key | Action |
 | --- | --- |
-| `1`〜`9` | 対応するチャートを選択。入力欄の編集中は無効 |
-| `↑` / `↓`、`j` / `k` | ポジション選択とチャート移動 |
-| `/` | 銘柄検索。候補を選んで Enter |
-| `e` | 取引所の選択欄を開く |
-| `l` | 配置の選択欄を開く |
-| `Ctrl + 1〜9` | チャート数を変更 |
-| `←` / `→` | 過去・次の足へ移動 |
-| `Shift + ←` / `Shift + →` | 5 本ずつ移動 |
-| `Home` / `End` | 読み込み済みの最古の足／最新足に戻る |
-| `PageUp` / `PageDown` | 1 画面分移動 |
-| `[` / `]` | 選択枠の時間足を変更 |
-| `Shift + [` / `Shift + ]` | 全枠の時間足を変更 |
-| `a` | 時間足の同期を切り替え |
-| `s` | カーソル時刻をほかの枠に同期 |
-| `+` / `-`（`=` でも拡大） | 価格軸の拡大・縮小。最大 64 倍 |
-| `0` | 価格軸の拡大率をリセット |
-| `Ctrl + ↑` / `Ctrl + ↓` | 表示する足の本数を増減 |
-| `v` | FINE / SOLID の描画方式を変更 |
-| `z` | 最大化／元に戻す |
-| `p` / `Shift + P` | ポジション欄を手動切替／自動へ戻す |
-| `?` | ショートカット一覧 |
-| `Ctrl + P` | コマンドパレット |
-| `Tab` | 操作対象を切り替え |
-| `Esc` | ポジション欄へ戻る |
-| `r` | 即時更新 |
-| `q` / `Ctrl + C` | 終了 |
+| `1`–`9` | Select the corresponding chart; disabled while editing an input field |
+| `↑` / `↓`, `j` / `k` | Select positions and move between charts |
+| `/` | Search for symbols; select a suggestion and press Enter |
+| `e` | Open exchange selector |
+| `l` | Open layout selector |
+| `Ctrl + 1–9` | Change the number of chart panes |
+| `←` / `→` | Move to previous/next candle |
+| `Shift + ←` / `Shift + →` | Move five candles at a time |
+| `Home` / `End` | Jump to oldest loaded / latest candle |
+| `PageUp` / `PageDown` | Move one screen |
+| `[` / `]` | Change the selected chart's interval |
+| `Shift + [` / `Shift + ]` | Change all chart intervals |
+| `a` | Toggle interval synchronization |
+| `s` | Sync cursor time to other panes |
+| `+` / `-` (`=` also zooms in) | Zoom price axis in/out, up to 64× |
+| `0` | Reset price-axis zoom |
+| `Ctrl + ↑` / `Ctrl + ↓` | Increase/decrease the number of displayed candles |
+| `v` | Switch between FINE / SOLID rendering |
+| `z` | Maximize / restore chart |
+| `p` / `Shift + P` | Toggle positions manually / restore automatic visibility |
+| `?` | Show keyboard shortcuts |
+| `Ctrl + P` | Open command palette |
+| `Tab` | Change focus |
+| `Esc` | Return to the positions panel |
+| `r` | Refresh immediately |
+| `q` / `Ctrl + C` | Quit |
 
-## 履歴とリアルタイム表示
+## History and live display
 
-`←` / `→` で過去の足を表示すると、右上に `HISTORY -N` と日時、OHLC、出来高が表示されます。`End` で `LIVE` に戻ります。
+When you browse older candles with `←` / `→`, the top right displays `HISTORY -N` along with the timestamp, OHLC, and volume. Press `End` to return to `LIVE`.
 
-履歴の先頭に近づくと REST API からさらに古い足を取得します。同じ銘柄・時間足を表示している枠同士では、履歴キャッシュを共有します。履歴を見ている間も WebSocket の購読は継続します。
+Approaching the start of the loaded history triggers a REST request for older candles. Panes showing the same symbol and interval share their history cache. WebSocket subscriptions continue while you browse historical candles.
 
-使用できる時間足は `1m`、`5m`、`15m`、`30m`、`1h`、`4h`、`1d`、`1w`。Lighter は `1w` に対応せず、`1d` までです。
+Available intervals are `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, and `1w`. Lighter does not support `1w`, so its longest interval is `1d`.
 
-## 銘柄検索
+## Symbol search
 
-`/` を押すと候補が入力欄の下に最大 8 件表示されます。大文字と小文字は区別せず、完全一致・前方一致を優先します。
+Press `/` to display up to eight suggestions below the input field. Matching is case-insensitive, with exact and prefix matches prioritized.
 
-例えば `ZE` なら `ZEC / USDT`、`OIL` なら `UKOIL / USDT` や `USOIL / USDT` が候補になります。`BTC`、`ETHUSDT`、`SOL_USDT`、`ZEC/USDT` のような入力も受け付けます。
+For example, `ZE` may suggest `ZEC / USDT`, while `OIL` may suggest `UKOIL / USDT` and `USOIL / USDT`. Inputs such as `BTC`, `ETHUSDT`, `SOL_USDT`, and `ZEC/USDT` are also accepted.
 
-候補は選択中の取引所から最初に取得した銘柄一覧をもとに、手元で絞り込んでいます。一覧の取得に失敗しても、銘柄を直接入力して Enter を押せます。`Esc` で検索を閉じます。
+Suggestions are filtered locally from the symbol list initially retrieved from the active exchange. Even if fetching that list fails, you can type a symbol manually and press Enter. Press `Esc` to close search.
 
-## チャートの細かい表示
+## Chart display details
 
-FINE は点字マーカーを使った表示で、1 文字を横 2 × 縦 4 に分けて、ローソク足の実体・ヒゲ・出来高を描画します。`v` で SOLID に切り替えると、実体は半行、ヒゲは 1 行単位の表示になります。
+FINE uses Braille markers, dividing each character into a 2 × 4 grid to render candle bodies, wicks, and volume. Press `v` to switch to SOLID, where bodies have half-line resolution and wicks have full-line resolution.
 
-ただ、点字の太さや見え方はフォントによって変わります。画面解像度以下の値動きは同じ位置に重なるため、もっと細かく見たいときは `+` で価格軸を拡大してください。
+Braille dot thickness and appearance depend on the font. Price movements smaller than the current screen resolution overlap, so press `+` to zoom the price axis if you need more detail.
 
-ポジションの黄色い `E` は建値を表しています。時刻は端末のローカル時間です。
+The yellow `E` on the chart marks a position's entry price. Timestamps use the terminal's local time.
 
-### ポジションの損益表示
+### Position PnL
 
-MEXC などの `Contracts` は契約枚数です。USDT / USDC 建ての先物は次の式で含み損益を計算します。
+For exchanges such as MEXC, `Contracts` means the number of contracts. Unrealized PnL for USDT/USDC-settled futures is calculated as:
 
 ```text
-(マーク価格 - 建値) × 契約枚数 × contractSize × 売買方向
+(mark price - entry price) × number of contracts × contractSize × position direction
 ```
 
-ROE は含み損益を証拠金で割った値で、手数料や資金調達料は含みません。価格や銘柄情報が取れない場合は `—` を表示します。インバース契約の含み損益・ROE は未対応です。
+ROE is unrealized PnL divided by margin; fees and funding payments are excluded. If price or symbol details are unavailable, the UI shows `—`. Unrealized PnL and ROE for inverse contracts are not supported.
 
-Hyperliquid は取引所が返す損益と ROE を表示し、数量も契約枚数ではなく実数量として扱います。合計損益は決済通貨ごとに表示します。
+For Hyperliquid, the displayed PnL and ROE come from the exchange. Quantities represent actual asset amounts rather than contract counts. Total PnL is displayed by settlement currency.
 
-## Konsole で Ctrl + 数字が効かない場合
+## If Ctrl + number does not work in Konsole
 
-Konsole の標準キーマップでは、`Ctrl + 1〜9` がアプリに区別できる形で送られない場合があります。
+Konsole's default keymap may not send `Ctrl + 1–9` in a form the application can distinguish.
 
 ```sh
 uv run perpetui --install-konsole-keymap
 ```
 
-コマンドを実行したら、Konsole の TUI 用プロファイルから `perpetui (Ctrl+1-9)` を選んでください。既存のプロファイルを自動で書き換えるものではありません。
+After running this command, select `perpetui (Ctrl+1-9)` from the Konsole TUI profile. The command does not automatically overwrite your existing profile.
 
-端末が別のマシンで動いているなら、[キーマップ](../src/perpetui/resources/konsole.keytab)を端末側の `~/.local/share/konsole/perpetui.keytab` へ配置して選択できます。
+If the terminal runs on another machine, copy the [keymap](../src/perpetui/resources/konsole.keytab) to `~/.local/share/konsole/perpetui.keytab` on the terminal host and select it.
 
-[README に戻る](../README.md)
+[Back to README](../README.md)

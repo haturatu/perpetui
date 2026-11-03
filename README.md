@@ -1,18 +1,20 @@
 # perpetui
 
-Hyperliquid、Lighter、MEXC の先物チャートと、保有しているポジションをターミナルで確認するためのアプリです。
+**English** | [日本語](README.ja.md)
 
-相場を見るだけならブラウザーでも十分なのですが、複数の銘柄を並べたいときや、ポジションとチャートを一つの画面で確認したいときには少し面倒なところがあります。
+perpetui is a terminal application for viewing futures charts and open positions on Hyperliquid, Lighter, and MEXC.
 
-というわけで、Python の Textual と Plotext を使って TUI にしました。起動は Go のランチャーから行います。
+A browser is fine for checking market prices, but it becomes inconvenient when you want to put several symbols side by side or see your positions and charts on the same screen.
 
-**注文や決済を実行する機能はありません。** 相場とポジションを確認するためのツールです。
+So I built a TUI with Python's Textual and Plotext. A Go launcher starts the application.
 
-![デモ画面（サンプルデータ）](docs/demo.png)
+**perpetui cannot place or close orders.** It is a read-only tool for monitoring markets and positions.
 
-## とりあえず起動する
+![Demo screen (sample data)](docs/demo.png)
 
-Python 3.11 以上、Go 1.23 以上、make と ANSI / UTF-8 対応の端末が必要です。画面は 120 列 × 40 行以上を推奨しています。
+## Get started
+
+You need Python 3.11 or later, Go 1.23 or later, `make`, and an ANSI/UTF-8-capable terminal. A terminal of at least 120 columns × 40 rows is recommended.
 
 ```sh
 git clone https://github.com/haturatu/perpetui.git
@@ -22,19 +24,17 @@ perpetui --demo
 perpetui --demo=portfolio
 ```
 
-`perpetui --demo` は単一取引所のサンプル画面、`perpetui --demo=portfolio` は
-Hyperliquid 2 口座・MEXC・Lighter をまとめた統合ポートフォリオのサンプル画面です。
-どちらも設定ファイルなしで起動できます。
+`perpetui --demo` opens a single-exchange sample. `perpetui --demo=portfolio` opens a combined portfolio sample with two Hyperliquid accounts, MEXC, and Lighter. Neither mode requires a configuration file.
 
-`make install` で、既定では `~/.local/bin/perpetui` と専用の Python 環境、シェル補完、man ページをインストールします。`~/.local/bin` に PATH が通っていない場合は追加してください。
+By default, `make install` installs `~/.local/bin/perpetui`, a dedicated Python environment, shell completions, and a man page. Add `~/.local/bin` to your `PATH` if necessary.
 
-Python の依存解決は uv を優先し、入っていなければ venv と pip に切り替えます。Go のバイナリをビルドするのに Go が必要ですが、**インストール済みのバイナリを起動するだけなら Go は不要**です。
+Python dependencies are resolved with uv when available, or with venv and pip otherwise. Go is required to build the launcher, but **not to run an already installed binary**.
 
-インストール先を変える場合や pip を明示的に使いたい場合は[インストール手順](docs/installation.md)を参照してください。
+See [installation](docs/installation.md) to change the installation paths or explicitly use pip.
 
-## 取引所を選ぶ
+## Choose an exchange
 
-既定は Hyperliquid です。監視するアカウントを指定しなければ公開相場だけを表示します。
+Hyperliquid is the default. Without an account to monitor, perpetui only displays public market data.
 
 ```sh
 perpetui --public
@@ -43,19 +43,17 @@ perpetui --exchange mexc
 perpetui --symbol SOL --interval 1h --lang ja
 ```
 
-| 取引所 | ポジションを見るために必要なもの | 数量の単位 |
+| Exchange | Required to monitor positions | Quantity unit |
 | --- | --- | --- |
-| Hyperliquid | ウォレットアドレス、または hl の保存済み設定 | 銘柄の実数量 |
-| Lighter | アカウント番号、または lighter の保存済み設定 | 銘柄の実数量 |
-| MEXC | API キーとシークレット、または mexc-cli の保存済み設定 | 契約枚数 |
+| Hyperliquid | Wallet address or saved `hl` configuration | Actual asset quantity |
+| Lighter | Account index or saved `lighter` configuration | Actual asset quantity |
+| MEXC | API key and secret or saved `mexc-cli` configuration | Number of contracts |
 
-Hyperliquid と Lighter は、秘密鍵を使わずに監視先を指定できます。一方、MEXC のポジション取得には認証設定が必要です。アカウントの読み込み順やテストネット、通信先は[取引所の設定](docs/exchanges.md)にまとめています。
+Hyperliquid and Lighter can monitor an account without a private key. MEXC requires authentication to retrieve positions. See [exchange configuration](docs/exchanges.md) for account lookup precedence, testnets, and endpoints.
 
-## 複数アカウントと統合ポートフォリオ
+## Multiple accounts and combined portfolios
 
-異なる取引所のポジションを一緒に確認したい場合は、
-`~/.config/perpetui/config.toml` に監視対象を登録できます。
-設定ファイルがなければ、従来の単一アカウントの起動方法のままです。
+To monitor positions across several exchanges at once, register the accounts in `~/.config/perpetui/config.toml`. Without this file, the original single-account mode still works.
 
 ```toml
 [portfolio]
@@ -87,73 +85,65 @@ id = "trading"
 accounts = ["hl-main", "mexc-main"]
 ```
 
-アドレスとアカウント番号は実際の値に置き換えてください。MEXC の API キーはこの設定ファイルに書かず、
-既存の mexc-cli の保存済みアカウントを参照します。
-`--config /path/to/config.toml` でも指定できます。
+Replace the example address and account index with your own. Do not put MEXC API keys in this TOML file; use an existing saved `mexc-cli` account instead. You can also specify the file with `--config /path/to/config.toml`.
 
-設定ファイルを作らずに統合表示だけを確認したい場合は、`perpetui --demo=portfolio` を実行してください。
-Hyperliquid 2 口座・MEXC・Lighter のサンプルアカウントと、`hedge` / `all-venues` ポートフォリオが
-組み込まれています。取引所の認証情報は読みません。
+To try the combined view without creating a configuration file, run `perpetui --demo=portfolio`. It includes two sample Hyperliquid accounts, MEXC, Lighter, and the predefined `hedge` / `all-venues` portfolios. No exchange credentials are read.
 
-ポジション欄では全取引所・個別取引所・アカウント・名前付きポートフォリオを切り替えられます。
-並び順は通常・取引所別・銘柄別から選べます。さらに「Exposure」に切り替えると、
-銘柄別のロング・ショート実数量、ネット・グロス数量、ロング比率を確認できます。
-この画面では取引所別・通貨別の証拠金も表示します。チャートの上部にある取引所選択は、
-統合モードでは**選択中のチャート枠のみ**に適用されます。
-ポジション行を選択すると、その取引所のチャートに切り替わります。
-別の枠や他の取引所のポジション監視は継続します。
+In the positions panel, you can switch between all exchanges, an individual exchange, an account, and a named portfolio. Positions can be shown in their normal order or grouped by exchange or symbol. The `Exposure` view shows long and short actual quantities by symbol, net and gross quantities, and long ratios. It also shows margin grouped by exchange and currency.
 
-合計 uPnL は USDC、USDT など通貨別に計算します。
-数量のネット・グロス集計は換算可能な線形契約に限定し、清算価格・レバレッジ・ROE は合算しません。
-任意で `[portfolio.fx_rates]` に `USDC = 1.0` のように手動レートを設定すると USD 換算参考値を表示できます。
-為替レートを明示しない場合、USD 換算の合計は表示しません。
-接続できないアカウントは STALE と表示し、最後のスナップショットを残します。
+In combined mode, the exchange selector above the charts affects **only the currently selected chart pane**. Selecting a position switches that pane to the position's exchange. Other panes and positions from other exchanges continue updating.
 
-## 複数チャートとポジション
+Total unrealized PnL is calculated separately for settlement currencies such as USDC and USDT. Net and gross quantity aggregation applies only to convertible linear contracts; liquidation prices, leverage, and ROE are not aggregated.
 
-複数チャートを並べると、画面の横幅によっては無駄な空きが出ます。なので、既定の Auto 配置では、チャート数とターミナルの幅・高さに合わせて枠を組み替えます。
+You can optionally set manual exchange rates, such as `USDC = 1.0` under `[portfolio.fx_rates]`, to show an indicative USD-converted total. Without explicit exchange rates, no combined USD total is shown.
 
-例えば 3 枠なら「上 1・下 2」、5 枠なら「上 3・下 2」といった形にもできます。配置を変えても、表示中のチャートの履歴や購読はそのままです。
+Accounts that become unreachable are marked `STALE`, and their last snapshots are retained.
 
-ポジション欄も固定の高さではありません。**ポジションが 0 件なら折りたたみ、件数が少なければ小さく表示**します。空いた領域はチャートに使います。
+## Multiple charts and positions
 
-同じ取引所・銘柄・時間足を複数枠で表示する場合は、通信を共有します。ただし履歴カーソル、拡大率、表示形式は枠ごとに持っています。
+Placing multiple charts side by side can leave wasted space. The default `Auto` layout rearranges panes based on the number of charts and the terminal's width and height.
 
-### よく使うキー
+For example, three panes can use one on top and two below; five panes can use three on top and two below. Rearranging panes does not reset chart history or subscriptions.
 
-| キー | 操作 |
+The positions panel also adjusts its height. **It collapses when there are no positions and stays compact when there are only a few**, leaving more room for charts.
+
+Panes showing the same exchange, symbol, and interval share their market data connections. Each pane still maintains its own history cursor, zoom level, and rendering mode.
+
+### Common shortcuts
+
+| Key | Action |
 | --- | --- |
-| `?` | ショートカット一覧 |
-| `Ctrl + 1〜9` | チャートの表示数を変更 |
-| `1`〜`9` | 操作するチャートを選択 |
-| `l` | Auto / Horizontal / Grid / Vertical を選択 |
-| `/` | 銘柄を検索 |
-| `e` | 取引所を切り替え（統合モードでは選択中のチャートのみ） |
-| `[` / `]` | 時間足を変更 |
-| `←` / `→`、`End` | 過去の足を見る／最新に戻る |
-| `z` | チャートを最大化／元に戻す |
-| `p` / `Shift + P` | ポジション欄の手動表示／自動表示へ戻す |
-| `r` | 更新 |
-| `q` / `Ctrl + C` | 終了 |
+| `?` | Show shortcuts |
+| `Ctrl + 1–9` | Change the number of chart panes |
+| `1`–`9` | Select a chart pane |
+| `l` | Choose Auto / Horizontal / Grid / Vertical |
+| `/` | Search symbols |
+| `e` | Switch exchanges (selected pane only in combined mode) |
+| `[` / `]` | Change the interval |
+| `←` / `→`, `End` | Browse historical candles / return to latest |
+| `z` | Maximize / restore a chart |
+| `p` / `Shift + P` | Manually toggle positions / restore automatic visibility |
+| `r` | Refresh |
+| `q` / `Ctrl + C` | Quit |
 
-全体の時間足同期、価格軸の拡大、銘柄検索、Konsole で Ctrl + 数字が効かないときの設定は[操作方法](docs/usage.md)を参照してください。
+See [usage](docs/usage.md) for syncing intervals, price-axis zoom, symbol search, and configuring Konsole when Ctrl + number is not recognized.
 
-## 開発する場合
+## Development
 
-インストールせずに動かしたいなら、リポジトリ内で次のように実行できます。
+To run from a checkout without installing:
 
 ```sh
 make setup
 uv run perpetui --demo
 ```
 
-uv がない環境でも `make setup` は pip を使えます。その場合の起動方法は[インストール手順](docs/installation.md)に記載しています。
+`make setup` can also use pip when uv is not available; see [installation](docs/installation.md) for the corresponding run command.
 
-テストや静的解析は以下です。
+Run tests and static analysis, or build a package, with:
 
 ```sh
 make check
 uv build
 ```
 
-[開発メモ](docs/development.md)と[アーキテクチャ](docs/architecture.md)に内部構成をまとめています。コマンドの全オプションは `perpetui --help` または `man perpetui` から確認できます。
+See [development](docs/development.md) and [architecture](docs/architecture.md) for implementation details. For all command-line options, run `perpetui --help` or `man perpetui`.
