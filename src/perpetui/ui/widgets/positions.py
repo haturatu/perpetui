@@ -23,7 +23,7 @@ class PositionsPane(Vertical):
     def compose(self) -> ComposeResult:
         with Horizontal(id="portfolio-filters"):
             yield Select(
-                [("All accounts", "all")],
+                [(_("All accounts"), "all")],
                 value="all",
                 allow_blank=False,
                 compact=True,
@@ -31,10 +31,10 @@ class PositionsPane(Vertical):
             )
             yield Select(
                 [
-                    ("Original", "none"),
-                    ("Exchange", "exchange"),
-                    ("Symbol", "symbol"),
-                    ("Exposure", "exposure"),
+                    (_("Original"), "none"),
+                    (_("Exchange"), "exchange"),
+                    (_("Symbol"), "symbol"),
+                    (_("Exposure"), "exposure"),
                 ],
                 value="none",
                 allow_blank=False,
@@ -62,7 +62,7 @@ class PositionsPane(Vertical):
         exposure_table = self.query_one("#exposures", DataTable)
         exposure_table.display = False
         exposure_table.clear(columns=True)
-        exposure_table.add_columns("Asset", "Long", "Short", "Net", "Gross", "Long %")
+        exposure_table.add_columns(*map(_, ("Asset", "Long", "Short", "Net", "Gross", "Long %")))
         table = self.query_one("#positions", DataTable)
         with table.prevent(DataTable.RowHighlighted):
             table.clear(columns=True)
@@ -211,7 +211,7 @@ class PositionsPane(Vertical):
                 empty.update(_("No comparable linear contract positions"))
             margins = portfolio.margin_by_venue(positions)
             for (exchange, currency), margin in sorted(margins.items()):
-                summary.append(f"  ·  {exchange} margin {price(margin)} {currency}")
+                summary.append("  ·  " + _("{exchange} margin {margin} {currency}", exchange=exchange, margin=price(margin), currency=currency))
         self.query_one("#positions-summary", Static).update(summary)
         return selected_id
 
