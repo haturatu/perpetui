@@ -163,5 +163,8 @@
   "Portfolio: {name}": "ポートフォリオ: {name}",
   "Exchange: {exchange}": "取引所: {exchange}",
   "{exchange} margin {margin} {currency}": "{exchange} 証拠金 {margin} {currency}",
-  "Optional account portfolio TOML (default: ~/.config/perpetui/config.toml)": "複数アカウント設定 TOML（既定: ~/.config/perpetui/config.toml）"
+  "Optional account portfolio TOML (default: ~/.config/perpetui/config.toml)": "複数アカウント設定 TOML（既定: ~/.config/perpetui/config.toml）",
+  "ctr": "枚",
+  "base": "実数量",
+  "{instrument} net {net} / gross {gross}": "{instrument} ネット {net} / グロス {gross}"
 }

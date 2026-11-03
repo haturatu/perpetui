@@ -105,7 +105,7 @@ class PositionsPane(Vertical):
                     f"{p.contracts:,.0f}" if p.contracts == int(p.contracts) else str(p.contracts)
                 )
                 if portfolio is not None:
-                    quantity += " ctr" if p.account.exchange == "mexc" else " base"
+                    quantity += " " + _("ctr" if p.account.exchange == "mexc" else "base")
                 cells = (
                     *(
                         (
@@ -179,8 +179,13 @@ class PositionsPane(Vertical):
                 if len(exposures) == 1:
                     exposure = next(iter(exposures.values()))
                     summary.append(
-                        f"  ·  {exposure.instrument} net {exposure.net_size:+} "
-                        f"/ gross {exposure.gross_size}"
+                        "  ·  "
+                        + _(
+                            "{instrument} net {net} / gross {gross}",
+                            instrument=exposure.instrument,
+                            net=f"{exposure.net_size:+}",
+                            gross=str(exposure.gross_size),
+                        )
                     )
         risk_mode = (
             portfolio is not None and getattr(self.app, "_portfolio_group", "none") == "exposure"

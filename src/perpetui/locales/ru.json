@@ -163,5 +163,8 @@
   "Portfolio: {name}": "Портфель: {name}",
   "Exchange: {exchange}": "Биржа: {exchange}",
   "{exchange} margin {margin} {currency}": "{exchange} маржа {margin} {currency}",
-  "Optional account portfolio TOML (default: ~/.config/perpetui/config.toml)": "Необязательный TOML портфеля (по умолчанию ~/.config/perpetui/config.toml)"
+  "Optional account portfolio TOML (default: ~/.config/perpetui/config.toml)": "Необязательный TOML портфеля (по умолчанию ~/.config/perpetui/config.toml)",
+  "ctr": "контр.",
+  "base": "база",
+  "{instrument} net {net} / gross {gross}": "{instrument} нетто {net} / брутто {gross}"
 }

@@ -163,5 +163,8 @@
   "Portfolio: {name}": "投資組合: {name}",
   "Exchange: {exchange}": "交易所: {exchange}",
   "{exchange} margin {margin} {currency}": "{exchange} 保證金 {margin} {currency}",
-  "Optional account portfolio TOML (default: ~/.config/perpetui/config.toml)": "選用的多帳戶組合 TOML（預設 ~/.config/perpetui/config.toml）"
+  "Optional account portfolio TOML (default: ~/.config/perpetui/config.toml)": "選用的多帳戶組合 TOML（預設 ~/.config/perpetui/config.toml）",
+  "ctr": "張",
+  "base": "基礎數量",
+  "{instrument} net {net} / gross {gross}": "{instrument} 淨 {net} / 總 {gross}"
 }
