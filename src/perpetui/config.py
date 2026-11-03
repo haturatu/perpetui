@@ -106,8 +106,8 @@ def load_config(path: Path) -> PortfolioConfig | None:
         raise ValueError("[portfolio] must be a table")
     view = settings.get("default_view", "all")
     group = settings.get("group_by", "none")
-    if group not in {"none", "exchange", "symbol"}:
-        raise ValueError("group_by must be none, exchange or symbol")
+    if group not in {"none", "exchange", "symbol", "exposure"}:
+        raise ValueError("group_by must be none, exchange, symbol or exposure")
     valid_views = {"all"}
     valid_views.update(f"account:{x.id}" for x in accounts)
     valid_views.update(f"exchange:{x.exchange}" for x in accounts)
