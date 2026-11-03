@@ -16,3 +16,4 @@ class WorkspaceState:
     all_timeframes: bool = False
     cursor_sync: bool = False
     positions_override: bool | None = None
+    # Portfolio scope and grouping are owned by TradingApp to preserve legacy defaults.
